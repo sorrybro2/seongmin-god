@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>현장 사진 Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+    <style>
+        /* 다크/라이트 모드 변수 */
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #1c1c1e;
+            --bg-tertiary: #2c2c2e;
+            --text-primary: #ffffff;
+            --text-secondary: #e5e5ea;
+            --text-tertiary: #a1a1a6;
+            --border-color: #3a3a3c;
+            --shadow: rgba(0,0,0,0.5);
+        }
+        
+        body.light-mode {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f2f2f7;
+            --bg-tertiary: #ffffff;
+            --text-primary: #000000;
+            --text-secondary: #1c1c1e;
+            --text-tertiary: #8e8e93;
+            --border-color: #d1d1d6;
+            --shadow: rgba(0,0,0,0.1);
+        }
+        
+        body { 
+            font-family: -apple-system, sans-serif; 
+            padding: 20px; 
+            background: var(--bg-primary); 
+            color: var(--text-primary);
+            transition: background-color 0.3s, color 0.3s;
+            margin: 0;
+        }
+        
+        /* 헤더 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 0 5px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: var(--text-primary);
+        }
+        .settings-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-primary);
+        }
+        .back-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 16px;
+            cursor: pointer;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .card { 
+            background: var(--bg-secondary); 
+            padding: 15px; 
+            border-radius: 12px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 4px 12px var(--shadow); 
+            box-sizing: border-box;
+            border: 1px solid var(--border-color);
+        }
+        h3 { 
+            margin: 0 0 12px 0; 
+            font-size: 16px; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 8px; 
+            color: var(--text-secondary); 
+        }
+        
+        /* 레이아웃 최적화 */
+        .row { display: flex; gap: 10px; margin-bottom: 8px; align-items: stretch; width: 100%; }
+        .col-key { 
+            width: 65px; 
+            flex: none !important; 
+            font-weight: bold; 
+            background: var(--bg-tertiary); 
+            color: var(--text-tertiary); 
+            border: 1px solid var(--border-color); 
+            padding: 12px 5px; 
+            border-radius: 8px; 
+            text-align: center; 
+            font-size: 13px; 
+            box-sizing: border-box; 
+        }
+        input, select { 
+            flex: 1; 
+            min-width: 0; 
+            padding: 12px; 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            font-size: 15px; 
+            background: var(--bg-tertiary); 
+            color: var(--text-primary); 
+            box-sizing: border-box; 
+        }
+        
+        /* 입력 상자 내부 삭제 버튼 */
+        .input-wrapper { position: relative; flex: 1; display: flex; align-items: center; min-width: 0; }
+        .input-wrapper input { flex: 1; min-width: 0; }
+        .input-with-clear { padding-right: 40px !important; }
+        .clear-btn { 
+            position: absolute; 
+            right: 8px; 
+            background: #8e8e93; 
+            border: none; 
+            border-radius: 50%; 
+            width: 24px; 
+            height: 24px; 
+            color: white; 
+            font-size: 14px; 
+            cursor: pointer; 
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        .clear-btn:active { background: #636366; }
+        
+        /* 날짜 입력 */
+        input[type="date"] {
+            color-scheme: light dark;
+            -webkit-appearance: none;
+        }
+        body.light-mode input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0);
+        }
+        body:not(.light-mode) input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+        
+        button { padding: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-blue { background: #0a84ff; color: white; width: 100%; margin-top: 10px; }
+        .btn-green { background: #30d158; color: white; width: 100%; margin-top: 10px; }
+        .btn-red { background: #ff453a; color: white; width: 70px; font-size: 13px; flex-shrink: 0; }
+        .btn-gray { background: #8e8e93; color: white; width: 70px; font-size: 13px; flex-shrink: 0; }
+        .btn-orange { background: #ff9f0a; color: white; width: 100%; margin-top: 10px; }
+        .btn-purple { background: #bf5af2; color: white; width: 100%; margin-top: 10px; }
+        
+        #status { text-align: center; margin-top: 15px; font-weight: 600; color: #0a84ff; }
+        #openFilesBtn { display: none; }
+        
+        /* 테마 토글 스위치 */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        .toggle-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 51px;
+            height: 31px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #8e8e93;
+            transition: .3s;
+            border-radius: 31px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 27px;
+            width: 27px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #0a84ff;
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        
+        /* 화면 전환 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        .setting-description {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-tertiary);
+            margin-top: 10px;
+        }
+        
+        /* 클라우드 연결 상태 */
+        .cloud-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .cloud-status.connected {
+            border-color: #30d158;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #8e8e93;
+        }
+        .status-indicator.connected {
+            background: #30d158;
+        }
+        .cloud-email {
+            flex: 1;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+
+<!-- 메인 화면 -->
+<div id="mainScreen" class="screen active">
+    <div class="header">
+        <h1>현장 사진 Pro</h1>
+        <button class="settings-btn" onclick="showSettings()">⚙️</button>
+    </div>
+
+    <div class="card">
+        <h3>📋 표 내용 입력</h3>
+        <div id="tableFields"></div>
+    </div>
+
+    <div class="card">
+        <h3>💾 템플릿 관리</h3>
+        <div class="row">
+            <select id="templateList" onchange="loadTemplate()"><option value="">템플릿 선택</option></select>
+            <button class="btn-red" onclick="deleteTemplate()">삭제</button>
+        </div>
+        <div class="row">
+            <div class="input-wrapper">
+                <input type="text" id="newTemplateName" class="input-with-clear" placeholder="새 이름" oninput="toggleClearBtn()">
+                <button class="clear-btn" id="clearNameBtn" onclick="clearTemplateName()">✕</button>
+            </div>
+            <button class="btn-gray" onclick="saveTemplate()">저장</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <input type="file" id="imageInput" multiple accept="image/jpeg,image/jpg,image/heic,image/heif" style="display: none;">
+        <button class="btn-blue" onclick="document.getElementById('imageInput').click()">📸 사진 선택 & 작업 시작</button>
+        <div id="status">대기 중...</div>
+        <button id="cancelUploadBtn" class="btn-red" onclick="cancelUpload()" style="display: none; width: 100%; margin-top: 10px;">❌ 업로드 취소</button>
+        <button id="openFilesBtn" class="btn-green" onclick="openFilesApp()">📂 파일 앱 열기</button>
+        <button id="uploadToCloudBtn" class="btn-purple" onclick="manualUploadToCloud()" style="display: none;">☁️ Dropbox에 업로드</button>
+        <button id="openDropboxBtn" class="btn-purple" onclick="openDropboxFolder()" style="display: none;">📂 Dropbox에서 보기</button>
+    </div>
+
+    <div class="card">
+        <h3>💾 템플릿 백업 & 복원</h3>
+        <button class="btn-blue" onclick="exportTemplates()">📤 템플릿 내보내기 (JSON)</button>
+        <input type="file" id="importInput" accept="application/json" style="display: none;" onchange="importTemplates(event)">
+        <button class="btn-green" onclick="document.getElementById('importInput').click()">📥 템플릿 가져오기 (JSON)</button>
+    </div>
+    
+    <div style="text-align: center; padding: 20px 0; color: var(--text-tertiary); font-size: 13px;">
+        만든 이 Juneui
+    </div>
+</div>
+
+<!-- 설정 화면 -->
+<div id="settingsScreen" class="screen">
+    <div class="header">
+        <button class="back-btn" onclick="showMain()">← 뒤로가기</button>
+        <h1 style="margin-left: auto;">설정</h1>
+    </div>
+
+    <div class="card">
+        <h3>📦 Dropbox 연동</h3>
+        <div class="cloud-status" id="dropboxStatus">
+            <div class="status-indicator" id="dropboxIndicator"></div>
+            <span class="cloud-email" id="dropboxEmail">연결되지 않음</span>
+        </div>
+        
+        <button class="btn-blue" id="dropboxConnectBtn" onclick="connectDropbox()">Dropbox 계정 연결</button>
+        <button class="btn-red" id="dropboxDisconnectBtn" onclick="disconnectDropbox()" style="display: none; width: 100%;">연결 해제</button>
+        
+        <div style="margin-top: 15px;">
+            <label style="display: block; font-size: 14px; color: var(--text-secondary); margin-bottom: 5px;">
+                📁 저장 폴더:
+            </label>
+            <input type="text" id="dropboxFolderPath" 
+                   placeholder="/현장사진" 
+                   value="/현장사진"
+                   style="width: 100%; padding: 12px; border: 1px solid var(--border-color); 
+                          border-radius: 8px; font-size: 14px; background: var(--bg-tertiary); 
+                          color: var(--text-primary); box-sizing: border-box;"
+                   onchange="saveDropboxFolder()">
+            <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 5px;">
+                예: /현장사진, /Photos, /Work 등
+            </div>
+        </div>
+        
+        <div class="toggle-row" style="margin-top: 15px;">
+            <span class="toggle-label">날짜별 하위 폴더 생성</span>
+            <label class="switch">
+                <input type="checkbox" id="dropboxDateFolder" onchange="saveDropboxFolder()" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-description">
+            ON: /현장사진/2026/02/ <br>
+            OFF: /현장사진/
+        </div>
+        
+        <div class="toggle-row" style="margin-top: 15px;">
+            <span class="toggle-label">Dropbox 자동 업로드</span>
+            <label class="switch">
+                <input type="checkbox" id="dropboxAutoUpload" onchange="toggleDropboxSettings()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div class="toggle-row" style="margin-top: 15px;">
+            <span class="toggle-label">확인 후 업로드</span>
+            <label class="switch">
+                <input type="checkbox" id="dropboxManualUpload" onchange="toggleDropboxSettings()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div class="setting-description">
+            ✨ 영구 사용 가능! 버튼 클릭만으로 간편 연결
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>🎨 테마 설정</h3>
+        <div class="toggle-row">
+            <span class="toggle-label">다크 모드</span>
+            <label class="switch">
+                <input type="checkbox" id="themeToggle" onchange="toggleTheme()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="setting-description">밝은 화면을 원하시면 토글을 끄세요</div>
+    </div>
+
+    <div class="card">
+        <h3>📏 표 크기 설정</h3>
+        <div style="padding: 10px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="color: var(--text-primary); font-size: 14px;">표 크기</span>
+                <span id="tableSizeValue" style="color: #0a84ff; font-weight: bold;">100%</span>
+            </div>
+            <input type="range" id="tableSizeSlider" min="50" max="150" value="100" 
+                   style="width: 100%; height: 6px; border-radius: 3px; background: var(--bg-tertiary); 
+                          border: 1px solid var(--border-color); cursor: pointer;"
+                   oninput="updateTableSize(this.value)">
+            <div style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 12px; color: var(--text-tertiary);">
+                <span>50%</span>
+                <span>100%</span>
+                <span>150%</span>
+            </div>
+        </div>
+        <div class="setting-description">표의 전체 크기를 조절합니다</div>
+    </div>
+
+    <div class="card">
+        <h3>🔄 앱 업데이트</h3>
+        <button class="btn-orange" onclick="updateApp()">🔄 최신 버전으로 업데이트</button>
+        <div class="setting-description">캐시를 삭제하고 최신 버전을 불러옵니다</div>
+    </div>
+</div>
+
+<script>
+    // ========== 설정 키 ==========
+    const storageKey = 'photo_pro_v8_final';
+    const themeKey = 'photo_pro_theme';
+    const dropboxKey = 'photo_pro_dropbox';
+    const tableSizeKey = 'photo_pro_table_size';
+    
+    // ========== Dropbox OAuth PKCE 설정 ==========
+    const DROPBOX_CLIENT_ID = 'eafpljx4claj83h';
+    const DROPBOX_REDIRECT_URI = window.location.href.split('#')[0].split('?')[0];
+    
+    // ========== 전역 변수 ==========
+    let gapiInited = false;
+    
+    let currentZipBlob = null;
+    let currentZipFileName = null;
+    let tableSize = 100; // 표 크기 (기본 100%)
+    
+    const statusText = document.getElementById('status');
+    const openFilesBtn = document.getElementById('openFilesBtn');
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}년 ${String(today.getMonth() + 1).padStart(2, '0')}월 ${String(today.getDate()).padStart(2, '0')}일`;
+    
+    let currentTemplateName = "";
+    let currentData = [
+        {k: "공사명", v: ""}, {k: "시료번호", v: ""},
+        {k: "일자", v: dateStr}, {k: "채취구분", v: ""}, {k: "조사자", v: ""}
+    ];
+
+    // ========== EXIF 유틸리티 함수 ==========
+    function formatDateForExif(date) {
+        const d = (typeof date === 'string' || typeof date === 'number') ? new Date(date) : date;
+        const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+        const h = String(d.getHours()).padStart(2, '0'), min = String(d.getMinutes()).padStart(2, '0'), s = String(d.getSeconds()).padStart(2, '0');
+        return `${y}:${m}:${day} ${h}:${min}:${s}`;
+    }
+
+    function toRational(n) { 
+        const t = 1.0E-6; 
+        let num = 1, den = 1; 
+        while (Math.abs(n - Math.round(n)) > t && den < 100000) { 
+            n *= 10; 
+            den *= 10; 
+        } 
+        return [Math.round(n), den]; 
+    }
+    
+    function degToDmsRational(d) { 
+        const abs = Math.abs(d); 
+        const deg = Math.floor(abs); 
+        const minF = (abs - deg) * 60; 
+        const min = Math.floor(minF); 
+        const sec = Math.round((minF - min) * 60 * 10000); 
+        return [[deg, 1], [min, 1], [sec, 10000]]; 
+    }
+
+    // ========== Google API 초기화 ==========
+    function gapiLoaded() {
+        gapi.load('client', initializeGapiClient);
+    }
+
+    async function initializeGapiClient() {
+        await gapi.client.init({
+            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+        });
+        gapiInited = true;
+        checkDriveConnection();
+    }
+
+    function gisLoaded() {
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_CLIENT_ID,
+            scope: GOOGLE_SCOPES,
+            prompt: '',
+            callback: async (response) => {
+                if (response.error !== undefined) {
+                    throw (response);
+                }
+                googleAccessToken = response.access_token;
+                await saveGoogleToken(response);
+                await updateDriveStatus();
+                alert('Google Drive에 연결되었습니다!');
+            },
+        });
+    }
+
+    // ========== Google Drive 관리 ==========
+    async function connectGoogleDrive() {
+        if (!gapiInited || !googleTokenClient) {
+            alert('Google API가 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+            return;
+        }
+        googleTokenClient.requestAccessToken({ prompt: 'consent' });
+    }
+
+    async function disconnectGoogleDrive() {
+        if (confirm('Google Drive 연결을 해제하시겠습니까?')) {
+            if (googleAccessToken) {
+                google.accounts.oauth2.revoke(googleAccessToken);
+            }
+            localStorage.removeItem(driveKey);
+            googleAccessToken = null;
+            await updateDriveStatus();
+            alert('연결이 해제되었습니다.');
+        }
+    }
+
+    async function saveGoogleToken(response) {
+        const driveData = {
+            access_token: response.access_token,
+            expires_at: Date.now() + (response.expires_in * 1000),
+            autoUpload: document.getElementById('driveAutoUpload').checked,
+            manualUpload: document.getElementById('driveManualUpload').checked
+        };
+        
+        try {
+            const userInfo = await gapi.client.request({
+                path: 'https://www.googleapis.com/oauth2/v2/userinfo'
+            });
+            driveData.email = userInfo.result.email;
+        } catch (err) {
+            console.error('사용자 정보 가져오기 실패:', err);
+        }
+        
+        localStorage.setItem(driveKey, JSON.stringify(driveData));
+    }
+
+    async function loadGoogleToken() {
+        const saved = localStorage.getItem(driveKey);
+        if (!saved) return false;
+        
+        const driveData = JSON.parse(saved);
+        
+        if (Date.now() >= (driveData.expires_at - 300000)) {
+            return false;
+        }
+        
+        googleAccessToken = driveData.access_token;
+        gapi.client.setToken({ access_token: googleAccessToken });
+        
+        document.getElementById('driveAutoUpload').checked = driveData.autoUpload || false;
+        document.getElementById('driveManualUpload').checked = driveData.manualUpload || false;
+        
+        return true;
+    }
+
+    async function checkDriveConnection() {
+        const connected = await loadGoogleToken();
+        await updateDriveStatus();
+    }
+
+    async function updateDriveStatus() {
+        const status = document.getElementById('driveStatus');
+        const indicator = document.getElementById('driveIndicator');
+        const email = document.getElementById('driveEmail');
+        const connectBtn = document.getElementById('driveConnectBtn');
+        const disconnectBtn = document.getElementById('driveDisconnectBtn');
+        
+        const saved = localStorage.getItem(driveKey);
+        
+        if (googleAccessToken && saved) {
+            const driveData = JSON.parse(saved);
+            status.classList.add('connected');
+            indicator.classList.add('connected');
+            email.textContent = driveData.email || '연결됨';
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'block';
+        } else {
+            status.classList.remove('connected');
+            indicator.classList.remove('connected');
+            email.textContent = '연결되지 않음';
+            connectBtn.style.display = 'block';
+            disconnectBtn.style.display = 'none';
+        }
+    }
+
+    function toggleDriveSettings() {
+        const saved = localStorage.getItem(driveKey);
+        if (saved) {
+            const driveData = JSON.parse(saved);
+            driveData.autoUpload = document.getElementById('driveAutoUpload').checked;
+            driveData.manualUpload = document.getElementById('driveManualUpload').checked;
+            localStorage.setItem(driveKey, JSON.stringify(driveData));
+        }
+    }
+
+    async function ensureValidGoogleToken() {
+        const saved = localStorage.getItem(driveKey);
+        if (!saved) return false;
+        
+        const driveData = JSON.parse(saved);
+        
+        if (Date.now() >= (driveData.expires_at - 300000)) {
+            alert('Google Drive 연결이 만료되었습니다.\n설정에서 다시 연결해주세요.');
+            googleAccessToken = null;
+            return false;
+        }
+        
+        return true;
+    }
+
+    async function uploadToGoogleDrive(blob, fileName) {
+        if (!await ensureValidGoogleToken()) {
+            throw new Error('Google Drive 연결이 만료되었습니다.');
+        }
+        
+        if (!googleAccessToken) {
+            throw new Error('Google Drive에 연결되어 있지 않습니다.');
+        }
+
+        const metadata = {
+            name: fileName,
+            mimeType: 'application/zip'
+        };
+
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${googleAccessToken}`
+            },
+            body: form
+        });
+
+        if (!response.ok) {
+            throw new Error('업로드 실패');
+        }
+
+        const result = await response.json();
+        googleLastFolderId = result.id;
+        return result;
+    }
+
+    function openDriveFolder() {
+        if (googleLastFolderId) {
+            window.open(`https://drive.google.com/file/d/${googleLastFolderId}/view`, '_blank');
+        } else {
+            window.open('https://drive.google.com/drive/my-drive', '_blank');
+        }
+    }
+
+    // ========== Dropbox OAuth PKCE 관리 ==========
+    
+    // PKCE Code Verifier 생성
+    async function generateCodeVerifier() {
+        const array = new Uint8Array(32);
+        window.crypto.getRandomValues(array);
+        return btoa(String.fromCharCode(...array))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    // PKCE Code Challenge 생성
+    async function generateCodeChallenge(verifier) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(verifier);
+        const digest = await window.crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode(...new Uint8Array(digest)))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    // Dropbox 로그인 시작
+    async function connectDropbox() {
+        try {
+            const verifier = await generateCodeVerifier();
+            localStorage.setItem('dropbox_code_verifier', verifier); // iOS Safari 대비 localStorage 사용
+
+            const challenge = await generateCodeChallenge(verifier);
+            
+            const authUrl = `https://www.dropbox.com/oauth2/authorize?` +
+                `client_id=${DROPBOX_CLIENT_ID}&` +
+                `redirect_uri=${encodeURIComponent(DROPBOX_REDIRECT_URI)}&` +
+                `response_type=code&` +
+                `code_challenge=${challenge}&` +
+                `code_challenge_method=S256&` +
+                `token_access_type=offline`; // Refresh Token 받기
+
+            console.log('Dropbox OAuth 시작:', authUrl);
+            window.location.href = authUrl;
+        } catch (error) {
+            console.error('Dropbox 연결 시작 실패:', error);
+            alert('Dropbox 연결을 시작할 수 없습니다.\n' + error.message);
+        }
+    }
+
+    // Dropbox OAuth 콜백 처리
+    async function handleDropboxCallback() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const verifier = localStorage.getItem('dropbox_code_verifier'); // localStorage에서 가져오기
+
+        if (code && verifier) {
+            console.log('Dropbox 콜백 처리 중...');
+            
+            // URL 정리
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            try {
+                statusText.innerText = 'Dropbox 인증 중...';
+                
+                // Authorization Code를 Access Token으로 교환
+                const tokenResponse = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        code: code,
+                        grant_type: 'authorization_code',
+                        client_id: DROPBOX_CLIENT_ID,
+                        code_verifier: verifier,
+                        redirect_uri: DROPBOX_REDIRECT_URI
+                    })
+                });
+
+                if (!tokenResponse.ok) {
+                    const errorText = await tokenResponse.text();
+                    throw new Error('토큰 교환 실패: ' + errorText);
+                }
+
+                const tokenData = await tokenResponse.json();
+                console.log('토큰 교환 성공!');
+
+                if (tokenData.access_token) {
+                    dropboxAccessToken = tokenData.access_token;
+                    dropboxRefreshToken = tokenData.refresh_token;
+
+                    // 계정 정보 가져오기
+                    const accountResponse = await fetch('https://api.dropboxapi.com/2/users/get_current_account', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${dropboxAccessToken}` }
+                    });
+
+                    if (!accountResponse.ok) {
+                        throw new Error('계정 정보 가져오기 실패');
+                    }
+
+                    const accountData = await accountResponse.json();
+                    console.log('계정 정보:', accountData.email);
+
+                    // 저장
+                    const dropboxData = {
+                        access_token: tokenData.access_token,
+                        refresh_token: tokenData.refresh_token,
+                        expires_at: Date.now() + (tokenData.expires_in * 1000),
+                        email: accountData.email,
+                        name: accountData.name.display_name,
+                        autoUpload: false,
+                        manualUpload: false
+                    };
+
+                    localStorage.setItem(dropboxKey, JSON.stringify(dropboxData));
+                    localStorage.removeItem('dropbox_code_verifier'); // 검증값 삭제
+
+                    await updateDropboxStatus();
+                    alert('Dropbox에 연결되었습니다!\n계정: ' + accountData.email);
+                    statusText.innerText = '대기 중...';
+                } else {
+                    throw new Error('Access Token을 받지 못했습니다.');
+                }
+            } catch (error) {
+                console.error('Dropbox OAuth 콜백 오류:', error);
+                alert('Dropbox 연결에 실패했습니다.\n\n' + error.message);
+                statusText.innerText = '대기 중...';
+                localStorage.removeItem('dropbox_code_verifier');
+            }
+        }
+    }
+
+    // Dropbox 연결 해제
+    async function disconnectDropbox() {
+        if (confirm('Dropbox 연결을 해제하시겠습니까?')) {
+            localStorage.removeItem(dropboxKey);
+            dropboxAccessToken = null;
+            dropboxRefreshToken = null;
+            await updateDropboxStatus();
+            alert('연결이 해제되었습니다.');
+        }
+    }
+
+    // Dropbox 토큰 로드 및 자동 갱신
+    async function loadDropboxToken() {
+        const saved = localStorage.getItem(dropboxKey);
+        if (!saved) return false;
+        
+        const dropboxData = JSON.parse(saved);
+        
+        // 토큰 만료 확인 (10분 여유)
+        if (Date.now() > (dropboxData.expires_at - 600000)) {
+            console.log('Dropbox 토큰 만료 임박, 갱신 시도...');
+            
+            if (dropboxData.refresh_token) {
+                try {
+                    const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            grant_type: 'refresh_token',
+                            refresh_token: dropboxData.refresh_token,
+                            client_id: DROPBOX_CLIENT_ID
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('토큰 갱신 실패');
+                    }
+
+                    const newTokenData = await response.json();
+                    
+                    dropboxData.access_token = newTokenData.access_token;
+                    dropboxData.expires_at = Date.now() + (newTokenData.expires_in * 1000);
+                    
+                    localStorage.setItem(dropboxKey, JSON.stringify(dropboxData));
+                    
+                    dropboxAccessToken = newTokenData.access_token;
+                    console.log('✅ Dropbox 토큰 갱신 성공!');
+                } catch (error) {
+                    console.error('Dropbox 토큰 갱신 실패:', error);
+                    return false;
+                }
+            } else {
+                console.warn('Refresh Token이 없습니다. 재연결이 필요합니다.');
+                return false;
+            }
+        } else {
+            dropboxAccessToken = dropboxData.access_token;
+            dropboxRefreshToken = dropboxData.refresh_token;
+        }
+        
+        // 설정 복원
+        document.getElementById('dropboxAutoUpload').checked = dropboxData.autoUpload || false;
+        document.getElementById('dropboxManualUpload').checked = dropboxData.manualUpload || false;
+        
+        return true;
+    }
+
+    // Dropbox 토큰 유효성 확인 및 자동 갱신
+    async function ensureDropboxToken() {
+        const saved = localStorage.getItem(dropboxKey);
+        if (!saved) return false;
+        
+        const dropboxData = JSON.parse(saved);
+        
+        // 만료 10분 전이면 갱신 (iOS Safari 안정성 향상)
+        if (Date.now() > (dropboxData.expires_at - 600000) && dropboxData.refresh_token) {
+            try {
+                console.log('🔄 Dropbox 토큰 갱신 시도...');
+                const response = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        grant_type: 'refresh_token',
+                        refresh_token: dropboxData.refresh_token,
+                        client_id: DROPBOX_CLIENT_ID
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('토큰 갱신 실패');
+                }
+                
+                const newData = await response.json();
+                dropboxData.access_token = newData.access_token;
+                dropboxData.expires_at = Date.now() + (newData.expires_in * 1000);
+                
+                localStorage.setItem(dropboxKey, JSON.stringify(dropboxData));
+                dropboxAccessToken = newData.access_token;
+                
+                console.log('✅ Dropbox 토큰 자동 갱신 완료');
+                return true;
+            } catch (error) {
+                console.error('Dropbox 토큰 갱신 실패:', error);
+                return false;
+            }
+        }
+        
+        dropboxAccessToken = dropboxData.access_token;
+        return true;
+    }
+
+    // Dropbox 상태 업데이트
+    async function updateDropboxStatus() {
+        const status = document.getElementById('dropboxStatus');
+        const indicator = document.getElementById('dropboxIndicator');
+        const email = document.getElementById('dropboxEmail');
+        const connectBtn = document.getElementById('dropboxConnectBtn');
+        const disconnectBtn = document.getElementById('dropboxDisconnectBtn');
+        
+        const saved = localStorage.getItem(dropboxKey);
+        
+        if (dropboxAccessToken && saved) {
+            const dropboxData = JSON.parse(saved);
+            status.classList.add('connected');
+            indicator.classList.add('connected');
+            email.textContent = dropboxData.email || '연결됨';
+            connectBtn.style.display = 'none';
+            disconnectBtn.style.display = 'block';
+        } else {
+            status.classList.remove('connected');
+            indicator.classList.remove('connected');
+            email.textContent = '연결되지 않음';
+            connectBtn.style.display = 'block';
+            disconnectBtn.style.display = 'none';
+        }
+    }
+
+    // Dropbox 설정 토글
+    function toggleDropboxSettings() {
+        const saved = localStorage.getItem(dropboxKey);
+        if (saved) {
+            const dropboxData = JSON.parse(saved);
+            dropboxData.autoUpload = document.getElementById('dropboxAutoUpload').checked;
+            dropboxData.manualUpload = document.getElementById('dropboxManualUpload').checked;
+            localStorage.setItem(dropboxKey, JSON.stringify(dropboxData));
+        }
+    }
+
+    // Dropbox 폴더 설정 저장
+    function saveDropboxFolder() {
+        const folderPath = document.getElementById('dropboxFolderPath').value.trim() || '/현장사진';
+        const useDateFolder = document.getElementById('dropboxDateFolder').checked;
+        
+        localStorage.setItem('dropbox_folder_path', folderPath);
+        localStorage.setItem('dropbox_date_folder', useDateFolder);
+        
+        console.log('Dropbox 폴더 설정 저장:', folderPath, '날짜별:', useDateFolder);
+    }
+
+    // Dropbox 폴더 설정 로드
+    function loadDropboxFolder() {
+        const folderPath = localStorage.getItem('dropbox_folder_path') || '/현장사진';
+        const useDateFolder = localStorage.getItem('dropbox_date_folder') !== 'false'; // 기본 true
+        
+        document.getElementById('dropboxFolderPath').value = folderPath;
+        document.getElementById('dropboxDateFolder').checked = useDateFolder;
+    }
+
+    // Dropbox 저장 경로 생성 (표의 일자 필드 기반)
+    function getDropboxPath(fileName) {
+        let folderPath = localStorage.getItem('dropbox_folder_path') || '/현장사진';
+        const useDateFolder = localStorage.getItem('dropbox_date_folder') !== 'false';
+        
+        // 시작 슬래시 확인
+        if (!folderPath.startsWith('/')) {
+            folderPath = '/' + folderPath;
+        }
+        
+        // 날짜별 하위 폴더 추가 (표의 일자 필드 사용)
+        if (useDateFolder) {
+            // currentData[2].v에서 연도/월 추출
+            // 예: "2026년 02월 13일" → 2026/02
+            const dateStr = currentData[2].v; // 표의 일자 필드
+            const match = dateStr.match(/(\d{4})년 (\d{2})월/);
+            
+            if (match) {
+                const year = match[1];
+                const month = match[2];
+                folderPath = `${folderPath}/${year}/${month}`;
+            } else {
+                // 파싱 실패 시 오늘 날짜 사용
+                const today = new Date();
+                const year = today.getFullYear();
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                folderPath = `${folderPath}/${year}/${month}`;
+            }
+        }
+        
+        // 마지막 슬래시 제거 (있으면)
+        if (folderPath.endsWith('/')) {
+            folderPath = folderPath.slice(0, -1);
+        }
+        
+        return `${folderPath}/${fileName}`;
+    }
+
+    // 업로드 취소
+    function cancelUpload() {
+        if (currentUploadXHR) {
+            currentUploadXHR.abort();
+            currentUploadXHR = null;
+            statusText.innerText = '업로드가 취소되었습니다.';
+            document.getElementById('cancelUploadBtn').style.display = 'none';
+        }
+    }
+
+    // Dropbox 업로드 (진행률 표시 + 스마트 타임아웃)
+    async function uploadToDropbox(blob, fileName) {
+        if (!dropboxAccessToken) {
+            throw new Error('Dropbox 연결 정보가 없습니다.');
+        }
+
+        // 1. 파일명 안전하게 처리
+        const safeFileName = fileName.replace(/[:*?"<>|]/g, ''); 
+        
+        // 2. 저장 경로 생성 (폴더 설정 + 날짜별)
+        const fullPath = getDropboxPath(safeFileName);
+        
+        // 3. 헤더 생성 (한글 깨짐 방지)
+        const dropboxArg = JSON.stringify({
+            path: fullPath,
+            mode: 'add',
+            autorename: true,
+            mute: false
+        }).replace(/[\u007f-\uffff]/g, (c) => '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4));
+
+        console.log('📦 Dropbox 업로드 경로:', fullPath);
+
+        // 4. FileReader로 Blob을 ArrayBuffer로 변환 후 전송
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = function() {
+                const arrayBuffer = reader.result;
+                const xhr = new XMLHttpRequest();
+                
+                // 전역 변수에 저장 (취소용)
+                currentUploadXHR = xhr;
+                
+                // 취소 버튼 표시
+                document.getElementById('cancelUploadBtn').style.display = 'block';
+                
+                // 스마트 타임아웃: 진행이 멈추면 30초 후 중단
+                let lastProgressTime = Date.now();
+                let progressCheckInterval = setInterval(() => {
+                    if (Date.now() - lastProgressTime > 30000) {
+                        clearInterval(progressCheckInterval);
+                        xhr.abort();
+                        reject(new Error('업로드가 30초간 진행되지 않았습니다.'));
+                    }
+                }, 1000);
+                
+                xhr.open('POST', 'https://content.dropboxapi.com/2/files/upload');
+                xhr.setRequestHeader('Authorization', 'Bearer ' + dropboxAccessToken);
+                xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                xhr.setRequestHeader('Dropbox-API-Arg', dropboxArg);
+
+                // 진행률 표시
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) {
+                        lastProgressTime = Date.now(); // 진행 시간 갱신
+                        
+                        const percent = Math.round((event.loaded / event.total) * 100);
+                        const loadedMB = (event.loaded / 1048576).toFixed(1);
+                        const totalMB = (event.total / 1048576).toFixed(1);
+                        
+                        statusText.innerText = 
+                            `Dropbox 업로드 중... ${percent}% (${loadedMB}MB / ${totalMB}MB)`;
+                    }
+                };
+
+                xhr.onload = () => {
+                    clearInterval(progressCheckInterval);
+                    currentUploadXHR = null;
+                    document.getElementById('cancelUploadBtn').style.display = 'none';
+                    
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        const result = JSON.parse(xhr.responseText);
+                        dropboxLastPath = result.path_display;
+                        console.log('✅ Dropbox 업로드 성공:', result.path_display);
+                        resolve(result);
+                    } else {
+                        reject(new Error(`서버 응답 오류 (${xhr.status}): ${xhr.responseText}`));
+                    }
+                };
+
+                xhr.onerror = () => {
+                    clearInterval(progressCheckInterval);
+                    currentUploadXHR = null;
+                    document.getElementById('cancelUploadBtn').style.display = 'none';
+                    reject(new Error('네트워크 연결 끊김 (iOS PWA 제한)'));
+                };
+
+                xhr.onabort = () => {
+                    clearInterval(progressCheckInterval);
+                    currentUploadXHR = null;
+                    document.getElementById('cancelUploadBtn').style.display = 'none';
+                    reject(new Error('사용자가 업로드를 취소했습니다.'));
+                };
+
+                // ArrayBuffer 전송
+                xhr.send(arrayBuffer);
+            };
+
+            reader.onerror = function() {
+                reject(new Error('파일 읽기 실패 (I/O Error). 다시 시도해주세요.'));
+            };
+
+            reader.readAsArrayBuffer(blob);
+        });
+    }
+
+    // Dropbox 폴더 열기
+    function openDropboxFolder() {
+        window.open('https://www.dropbox.com/home', '_blank');
+    }
+
+    // 로컬 저장 함수 (iOS PWA 안정성)
+    function saveToLocal(blob, fileName) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = fileName;
+        document.body.appendChild(link); // iOS 안정성을 위해 body에 추가
+        link.click();
+        document.body.removeChild(link);
+        
+        openFilesBtn.style.display = 'block';
+        console.log('로컬 저장창 호출됨');
+    }
+
+    // ========== Dropbox 수동 업로드 ==========
+    async function manualUploadToCloud() {
+        if (!currentZipBlob || !currentZipFileName) {
+            alert('업로드할 파일이 없습니다.');
+            return;
+        }
+        
+        if (!dropboxAccessToken) {
+            alert('Dropbox에 연결되어 있지 않습니다.\n설정에서 연결 및 자동 업로드를 활성화해주세요.');
+            return;
+        }
+        
+        try {
+            statusText.innerText = 'Dropbox에 업로드 중...';
+            document.getElementById('uploadToCloudBtn').disabled = true;
+            
+            await uploadToDropbox(currentZipBlob, currentZipFileName);
+            
+            statusText.innerText = '✅ Dropbox 업로드 완료!';
+            document.getElementById('uploadToCloudBtn').style.display = 'none';
+            document.getElementById('openDropboxBtn').style.display = 'block';
+        } catch (error) {
+            console.error('업로드 실패:', error);
+            statusText.innerText = '업로드 실패: ' + error.message;
+            alert('업로드에 실패했습니다.\n' + error.message);
+            document.getElementById('uploadToCloudBtn').disabled = false;
+        }
+    }
+
+    // ========== 화면 전환 ==========
+    function showSettings() {
+        document.getElementById('mainScreen').classList.remove('active');
+        document.getElementById('settingsScreen').classList.add('active');
+    }
+
+    function showMain() {
+        document.getElementById('settingsScreen').classList.remove('active');
+        document.getElementById('mainScreen').classList.add('active');
+    }
+
+    // ========== 테마 ==========
+    function toggleTheme() {
+        const isDark = document.getElementById('themeToggle').checked;
+        if (isDark) {
+            document.body.classList.remove('light-mode');
+            localStorage.setItem(themeKey, 'dark');
+        } else {
+            document.body.classList.add('light-mode');
+            localStorage.setItem(themeKey, 'light');
+        }
+    }
+
+    function loadTheme() {
+        const savedTheme = localStorage.getItem(themeKey) || 'dark';
+        if (savedTheme === 'light') {
+            document.body.classList.add('light-mode');
+            document.getElementById('themeToggle').checked = false;
+        } else {
+            document.body.classList.remove('light-mode');
+            document.getElementById('themeToggle').checked = true;
+        }
+    }
+
+    // ========== 표 크기 설정 ==========
+    function updateTableSize(value) {
+        tableSize = parseInt(value);
+        document.getElementById('tableSizeValue').textContent = value + '%';
+        localStorage.setItem(tableSizeKey, tableSize);
+    }
+
+    function loadTableSize() {
+        const saved = localStorage.getItem(tableSizeKey);
+        if (saved) {
+            tableSize = parseInt(saved);
+            document.getElementById('tableSizeSlider').value = tableSize;
+            document.getElementById('tableSizeValue').textContent = tableSize + '%';
+        }
+    }
+
+    // ========== 기본 함수 ==========
+    function formatDateToKorean(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}년 ${month}월 ${day}일`;
+    }
+
+    function koreanToISO(koreanDate) {
+        const match = koreanDate.match(/(\d{4})년 (\d{2})월 (\d{2})일/);
+        return match ? `${match[1]}-${match[2]}-${match[3]}` : '';
+    }
+
+    function renderFields() {
+        const container = document.getElementById('tableFields');
+        container.innerHTML = '';
+        currentData.forEach((item, i) => {
+            const row = document.createElement('div');
+            row.className = 'row';
+            
+            if (item.k === "일자") {
+                const isoDate = koreanToISO(item.v);
+                row.innerHTML = `<input type="text" class="col-key" value="${item.k}" oninput="currentData[${i}].k=this.value">
+                                 <input type="date" value="${isoDate}" onchange="updateDateField(${i}, this.value)">`;
+            } else {
+                row.innerHTML = `<input type="text" class="col-key" value="${item.k}" oninput="currentData[${i}].k=this.value">
+                                 <div class="input-wrapper">
+                                     <input type="text" class="input-with-clear" value="${item.v}" oninput="currentData[${i}].v=this.value; toggleFieldClearBtn(${i}, 'value')">
+                                     <button class="clear-btn" id="clearValue${i}" onclick="clearFieldInput(${i}, 'value')">✕</button>
+                                 </div>`;
+            }
+            container.appendChild(row);
+            
+            if (item.k !== "일자") {
+                setTimeout(() => {
+                    toggleFieldClearBtn(i, 'value');
+                }, 0);
+            }
+        });
+    }
+
+    function updateDateField(index, isoDate) {
+        if (isoDate) {
+            const [year, month, day] = isoDate.split('-');
+            currentData[index].v = `${year}년 ${month}월 ${day}일`;
+        }
+    }
+
+    function getShortDate(str) {
+        const match = str.match(/(\d{4})년 (\d{2})월 (\d{2})일/);
+        return match ? (match[1].substring(2) + match[2] + match[3]) : "000000";
+    }
+
+    async function getExifDateTime(file) {
+        try {
+            const metadata = await exifr.parse(file, {pick: ['DateTimeOriginal', 'CreateDate']});
+            return (metadata && (metadata.DateTimeOriginal || metadata.CreateDate)) ? new Date(metadata.DateTimeOriginal || metadata.CreateDate) : new Date(0);
+        } catch (err) { 
+            return new Date(0); 
+        }
+    }
+
+    document.getElementById('imageInput').addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+        
+        openFilesBtn.style.display = 'none';
+        document.getElementById('openDropboxBtn').style.display = 'none';
+        document.getElementById('uploadToCloudBtn').style.display = 'none';
+        statusText.innerText = '사진 분석 및 정렬 중...';
+        
+        // 시간순 정렬
+        const filesWithTime = await Promise.all(
+            files.map(async (file) => ({
+                file: file,
+                time: await getExifDateTime(file)
+            }))
+        );
+        
+        filesWithTime.sort((a, b) => a.time - b.time);
+        
+        const zip = new JSZip();
+        
+        const baseTitle = currentTemplateName || currentData[0].v || "현장사진";
+        const sampleNumber = currentData[1].v;
+        const datePart = getShortDate(currentData[2].v);
+        
+        const zipFileName = sampleNumber 
+            ? `${baseTitle} ${sampleNumber} ${datePart}`.trim()
+            : `${baseTitle} ${datePart}`.trim();
+
+        const photoBaseName = sampleNumber || "사진";
+        
+        for (let i = 0; i < filesWithTime.length; i++) {
+            statusText.innerText = `${i+1}/${filesWithTime.length}개 처리 중...`;
+            const target = filesWithTime[i];
+            const blob = await processImage(target.file);
+            
+            // [핵심 1] 타임존 9시간 시차 보정
+            let fileDate = new Date();
+            if (target.time && target.time.getTime() > 0) {
+                fileDate = new Date(target.time.getTime() - (target.time.getTimezoneOffset() * 60000));
+            }
+            
+            // [핵심 2] ZIP 내부에 수정 날짜 강제 주입
+            zip.file(`${photoBaseName} (${i+1}).jpg`, blob, {
+                date: fileDate
+            });
+        }
+
+        statusText.innerText = '압축 파일 생성 중...';
+        const content = await zip.generateAsync({type: "blob"});
+        
+        currentZipBlob = content;
+        currentZipFileName = `${zipFileName}.zip`;
+        
+        // Dropbox 설정 확인
+        const dropboxData = localStorage.getItem(dropboxKey);
+        const dropboxSettings = dropboxData ? JSON.parse(dropboxData) : null;
+        const useDropbox = dropboxSettings && dropboxSettings.autoUpload && dropboxAccessToken;
+        
+        // ========== Dropbox 자동 업로드 (완전 직렬 실행) ==========
+        if (useDropbox && !dropboxSettings.manualUpload) {
+            try {
+                statusText.innerText = 'Dropbox에 업로드 중... (창을 닫지 마세요)';
+                // 업로드가 완전히 끝날 때까지 기다림
+                await uploadToDropbox(content, currentZipFileName);
+                statusText.innerText = '✅ Dropbox 업로드 완료!';
+                document.getElementById('openDropboxBtn').style.display = 'block';
+            } catch (err) {
+                console.error('Dropbox 업로드 실패:', err);
+                statusText.innerText = '❌ Dropbox 실패: ' + err.message;
+                alert('드롭박스 업로드에 실패했습니다.\n로컬 저장을 시작합니다.');
+            }
+        }
+        // 수동 업로드 모드
+        else if (useDropbox && dropboxSettings.manualUpload) {
+            statusText.innerText = "압축 완료! 확인 후 업로드하세요.";
+            document.getElementById('uploadToCloudBtn').style.display = 'block';
+            document.getElementById('uploadToCloudBtn').disabled = false;
+        } else {
+            statusText.innerText = "로컬 저장 완료!";
+        }
+        
+        // 업로드 완전히 끝난 후 로컬 저장
+        saveToLocal(content, currentZipFileName);
+    });
+
+    async function processImage(file) {
+        let extractedExif = null;
+        let correctDate = null;  // ← 새로 추가!
+        
+        try { 
+            // [1단계] 날짜만 정확히 추출 (mergeOutput: true 기본값)
+            const dateData = await exifr.parse(file, {
+                pick: ['DateTimeOriginal', 'CreateDate']
+            });
+            correctDate = dateData?.DateTimeOriginal || dateData?.CreateDate;
+            console.log('📅 올바른 날짜 추출:', correctDate);
+            
+            // [2단계] 전체 EXIF 추출 (기존 방식)
+            extractedExif = await exifr.parse(file, { 
+                tiff: true, 
+                exif: true, 
+                gps: true, 
+                iptc: true,
+                icc: true,
+                jfif: true,
+                ihdr: true,
+                reviveValues: true,
+                translateKeys: false,
+                translateValues: false,
+                mergeOutput: false
+            }); 
+        } catch (e) { 
+            console.warn("EXIF 추출 실패", e); 
+        }
+
+        return new Promise(res => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const originalDataUrl = e.target.result;
+                const img = new Image();
+                img.src = originalDataUrl;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width; 
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    // --- 표 그리기 시작 ---
+                    const scale = tableSize / 100;
+                    const rowH = canvas.height * 0.045 * scale;
+                    const fontSize = rowH * 0.75;
+                    ctx.font = `${fontSize}px Arial`;
+                    ctx.textBaseline = 'middle';
+                    
+                    let maxVWidth = 0;
+                    currentData.forEach(d => { 
+                        if(ctx.measureText(d.v).width > maxVWidth) maxVWidth = ctx.measureText(d.v).width; 
+                    });
+                    
+                    const keyWidth = ctx.measureText("공사명일자").width;
+                    const padding = 40 * scale; 
+                    const tableW = keyWidth + maxVWidth + (padding * 4);
+                    const tableH = rowH * 5;
+                    const x = 0; 
+                    const y = canvas.height - tableH;
+
+                    ctx.fillStyle = "white"; 
+                    ctx.fillRect(x, y, tableW, tableH);
+                    ctx.strokeStyle = "black"; 
+                    ctx.lineWidth = canvas.width * 0.0015; 
+                    ctx.fillStyle = "black";
+                    
+                    currentData.forEach((item, i) => {
+                        const cy = y + (i * rowH);
+                        ctx.strokeRect(x, cy, tableW, rowH);
+                        const splitX = x + keyWidth + (padding * 2);
+                        ctx.beginPath(); 
+                        ctx.moveTo(splitX, cy); 
+                        ctx.lineTo(splitX, cy+rowH); 
+                        ctx.stroke();
+                        ctx.fillText(item.k, x + padding, cy + (rowH * 0.5));
+                        ctx.fillText(item.v, splitX + padding, cy + (rowH * 0.5));
+                    });
+                    // --- 표 그리기 끝 ---
+
+                    canvas.toBlob(blob => {
+                        const reader2 = new FileReader();
+                        reader2.readAsDataURL(blob);
+                        reader2.onload = (e2) => {
+                            const newDataUrl = e2.target.result;
+                            try {
+                                // [핵심] 원본 EXIF 완전히 로드
+                                let originalExifObj = {};
+                                try {
+                                    originalExifObj = piexif.load(originalDataUrl);
+                                } catch (err) {
+                                    console.warn('원본 EXIF 로드 실패 (HEIC일 수 있음)');
+                                    originalExifObj = { "0th": {}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {} };
+                                }
+                                
+                                // exifr에서 추출한 데이터로 보강
+                                if (extractedExif) {
+                                    // Make, Model
+                                    if (extractedExif.Make) {
+                                        originalExifObj['0th'][piexif.ImageIFD.Make] = String(extractedExif.Make);
+                                    }
+                                    if (extractedExif.Model) {
+                                        originalExifObj['0th'][piexif.ImageIFD.Model] = String(extractedExif.Model);
+                                    }
+                                    
+                                    // [기존 방식] 날짜 임시 주입 (나중에 덮어씀)
+                                    let targetDate = extractedExif.DateTimeOriginal || extractedExif.CreateDate || new Date();
+                                    let dateStr = formatDateForExif(targetDate);
+                                    
+                                    if (!originalExifObj['Exif']) originalExifObj['Exif'] = {};
+                                    originalExifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = dateStr;
+                                    originalExifObj['Exif'][piexif.ExifIFD.DateTimeDigitized] = dateStr;
+                                    originalExifObj['0th'][piexif.ImageIFD.DateTime] = dateStr;
+
+                                    // 조리개 (FNumber)
+                                    if (extractedExif.FNumber !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.FNumber] = toRational(extractedExif.FNumber);
+                                    }
+                                    
+                                    // 셔터 속도 (ExposureTime)
+                                    if (extractedExif.ExposureTime !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.ExposureTime] = toRational(extractedExif.ExposureTime);
+                                    }
+                                    
+                                    // ISO
+                                    if (extractedExif.ISO !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.ISOSpeedRatings] = extractedExif.ISO;
+                                    }
+                                    
+                                    // 초점 거리 (FocalLength)
+                                    if (extractedExif.FocalLength !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.FocalLength] = toRational(extractedExif.FocalLength);
+                                    }
+                                    
+                                    // 렌즈 모델
+                                    if (extractedExif.LensModel) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.LensModel] = String(extractedExif.LensModel);
+                                    }
+                                    
+                                    // 화이트 밸런스
+                                    if (extractedExif.WhiteBalance !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.WhiteBalance] = extractedExif.WhiteBalance;
+                                    }
+                                    
+                                    // 플래시
+                                    if (extractedExif.Flash !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.Flash] = extractedExif.Flash;
+                                    }
+                                    
+                                    // 노출 모드
+                                    if (extractedExif.ExposureMode !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.ExposureMode] = extractedExif.ExposureMode;
+                                    }
+                                    
+                                    // 노출 보정
+                                    if (extractedExif.ExposureCompensation !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.ExposureBiasValue] = toRational(extractedExif.ExposureCompensation);
+                                    }
+                                    
+                                    // 측광 모드
+                                    if (extractedExif.MeteringMode !== undefined) {
+                                        originalExifObj['Exif'][piexif.ExifIFD.MeteringMode] = extractedExif.MeteringMode;
+                                    }
+
+                                    // GPS 정보
+                                    if (extractedExif.latitude && extractedExif.longitude) {
+                                        if (!originalExifObj['GPS']) originalExifObj['GPS'] = {};
+                                        originalExifObj['GPS'][piexif.GPSIFD.GPSVersionID] = [2, 2, 0, 0];
+                                        originalExifObj['GPS'][piexif.GPSIFD.GPSLatitudeRef] = extractedExif.latitude < 0 ? 'S' : 'N';
+                                        originalExifObj['GPS'][piexif.GPSIFD.GPSLatitude] = degToDmsRational(extractedExif.latitude);
+                                        originalExifObj['GPS'][piexif.GPSIFD.GPSLongitudeRef] = extractedExif.longitude < 0 ? 'W' : 'E';
+                                        originalExifObj['GPS'][piexif.GPSIFD.GPSLongitude] = degToDmsRational(extractedExif.longitude);
+                                        
+                                        // 고도
+                                        if (extractedExif.GPSAltitude !== undefined) {
+                                            originalExifObj['GPS'][piexif.GPSIFD.GPSAltitude] = toRational(extractedExif.GPSAltitude);
+                                            originalExifObj['GPS'][piexif.GPSIFD.GPSAltitudeRef] = extractedExif.GPSAltitude < 0 ? 1 : 0;
+                                        }
+                                    }
+                                    
+                                    console.log('✅ EXIF 메타데이터 완전 보존:', {
+                                        카메라: extractedExif.Make,
+                                        모델: extractedExif.Model,
+                                        조리개: extractedExif.FNumber,
+                                        셔터: extractedExif.ExposureTime,
+                                        ISO: extractedExif.ISO,
+                                        초점거리: extractedExif.FocalLength,
+                                        렌즈: extractedExif.LensModel,
+                                        GPS: extractedExif.latitude ? '있음' : '없음'
+                                    });
+                                }
+                                
+                                // [3단계] 올바른 날짜로 최종 덮어쓰기!
+                                if (correctDate) {
+                                    let correctDateStr = formatDateForExif(correctDate);
+                                    
+                                    if (!originalExifObj['Exif']) originalExifObj['Exif'] = {};
+                                    originalExifObj['Exif'][piexif.ExifIFD.DateTimeOriginal] = correctDateStr;
+                                    originalExifObj['Exif'][piexif.ExifIFD.DateTimeDigitized] = correctDateStr;
+                                    originalExifObj['0th'][piexif.ImageIFD.DateTime] = correctDateStr;
+                                    
+                                    console.log('📅 날짜 최종 수정:', correctDateStr);
+                                } else {
+                                    console.warn('⚠️ 올바른 날짜를 찾을 수 없음');
+                                }
+                                
+                                // EXIF 데이터를 새 이미지에 삽입
+                                const exifStr = piexif.dump(originalExifObj);
+                                const finalDataUrl = piexif.insert(exifStr, newDataUrl);
+                                
+                                fetch(finalDataUrl).then(r => r.blob()).then(res);
+                            } catch (err) { 
+                                console.error("메타데이터 주입 실패", err);
+                                res(blob); // 실패해도 이미지는 보존
+                            }
+                        };
+                    }, "image/jpeg", 0.95);
+                }
+            }
+        });
+    }
+
+    function openFilesApp() {
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        if (isIOS) {
+            window.location.href = 'shareddocuments://';
+        } else if (isAndroid) {
+            alert('파일이 다운로드 폴더에 저장되었습니다.');
+        } else {
+            alert('파일이 다운로드되었습니다.');
+        }
+    }
+
+    function saveTemplate() {
+        const name = document.getElementById('newTemplateName').value;
+        if(!name) return alert("이름 입력");
+        let t = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        t[name] = JSON.parse(JSON.stringify(currentData));
+        localStorage.setItem(storageKey, JSON.stringify(t));
+        currentTemplateName = name;
+        updateTmplList();
+        document.getElementById('templateList').value = name;
+        alert("저장 성공");
+    }
+
+    function loadTemplate() {
+        const n = document.getElementById('templateList').value;
+        const nameInput = document.getElementById('newTemplateName');
+        
+        if(!n) { 
+            currentTemplateName = ""; 
+            nameInput.value = "";
+            toggleClearBtn();
+            return; 
+        }
+        
+        const t = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        if(t[n]) { 
+            currentData = t[n]; 
+            currentData[2].v = dateStr;
+            currentTemplateName = n;
+            nameInput.value = n;
+            toggleClearBtn();
+            renderFields(); 
+        }
+    }
+
+    function deleteTemplate() {
+        const n = document.getElementById('templateList').value;
+        if(!n || !confirm("삭제할까요?")) return;
+        let t = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        delete t[n];
+        localStorage.setItem(storageKey, JSON.stringify(t));
+        if(currentTemplateName === n) {
+            currentTemplateName = "";
+            document.getElementById('newTemplateName').value = "";
+        }
+        updateTmplList();
+    }
+
+    function updateTmplList() {
+        const s = document.getElementById('templateList');
+        const t = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        s.innerHTML = '<option value="">템플릿 선택</option>';
+        for(let n in t) s.innerHTML += `<option value="${n}">${n}</option>`;
+    }
+
+    function clearTemplateName() {
+        document.getElementById('newTemplateName').value = '';
+        document.getElementById('clearNameBtn').style.display = 'none';
+    }
+
+    function toggleClearBtn() {
+        const input = document.getElementById('newTemplateName');
+        const btn = document.getElementById('clearNameBtn');
+        btn.style.display = input.value ? 'flex' : 'none';
+    }
+
+    function clearFieldInput(index, type) {
+        currentData[index].v = '';
+        renderFields();
+    }
+
+    function toggleFieldClearBtn(index, type) {
+        const btnId = `clearValue${index}`;
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+        
+        const value = currentData[index].v;
+        btn.style.display = value ? 'flex' : 'none';
+    }
+
+    function exportTemplates() {
+        const templates = localStorage.getItem(storageKey);
+        if (!templates || templates === '{}') {
+            alert('저장된 템플릿이 없습니다.');
+            return;
+        }
+        
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(templates);
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "photo_pro_templates.json");
+        downloadAnchor.click();
+        alert('템플릿을 내보냈습니다!');
+    }
+
+    function importTemplates(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+                const existingCount = Object.keys(existing).length;
+                
+                let shouldMerge = true;
+                if (existingCount > 0) {
+                    shouldMerge = confirm(`기존 템플릿 ${existingCount}개가 있습니다.\n\n확인: 기존 템플릿과 병합\n취소: 기존 템플릿 삭제 후 가져오기`);
+                }
+                
+                if (shouldMerge) {
+                    const merged = {...existing, ...importedData};
+                    localStorage.setItem(storageKey, JSON.stringify(merged));
+                } else {
+                    localStorage.setItem(storageKey, JSON.stringify(importedData));
+                }
+                
+                updateTmplList();
+                alert('템플릿을 가져왔습니다!');
+                document.getElementById('importInput').value = '';
+            } catch (error) {
+                alert('올바른 템플릿 파일이 아닙니다.');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function updateApp() {
+        if (confirm('앱을 최신 버전으로 업데이트합니다.\n\n계속하시겠습니까?')) {
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    for (let name of names) {
+                        caches.delete(name);
+                    }
+                });
+            }
+            window.location.reload(true);
+        }
+    }
+
+    // ========== 초기화 ==========
+    window.onload = async () => { 
+        renderFields(); 
+        updateTmplList(); 
+        loadTheme();
+        loadTableSize(); // 표 크기 설정 로드
+        loadDropboxFolder(); // Dropbox 폴더 설정 로드
+        
+        // 플랫폼별 버튼 텍스트
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const isAndroid = /Android/i.test(navigator.userAgent);
+        
+        if (isAndroid) {
+            document.getElementById('openFilesBtn').textContent = '📂 다운로드 폴더 확인';
+        } else if (isIOS) {
+            document.getElementById('openFilesBtn').textContent = '📂 파일 앱 열기';
+        }
+        
+        // Dropbox OAuth 콜백 처리
+        if (window.location.search.includes('code=')) {
+            await handleDropboxCallback();
+        }
+        
+        // Dropbox 토큰 로드
+        await loadDropboxToken();
+        await updateDropboxStatus();
+    };
+</script>
+</body>
+</html>
