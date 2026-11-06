@@ -13,7 +13,7 @@ import {
 } from '../lib/fields';
 
 /** 입력 중인 칸은 노랑을 옅게 깔아서 표시 */
-const cellFocus = 'focus-within:bg-accent/10';
+const cellFocus = 'focus-within:bg-accent/15';
 
 /** 표 안 선택 버튼: 고르면 노랑, 아니면 옅은 회색 */
 function Pick({ active, onClick, children, className }: { active: boolean; onClick: () => void; children: string; className?: string }) {
@@ -24,7 +24,7 @@ function Pick({ active, onClick, children, className }: { active: boolean; onCli
       onClick={onClick}
       className={clsx(
         'h-10 rounded-lg text-[16px] font-semibold transition-colors',
-        active ? 'bg-accent text-accent-ink' : 'bg-raised text-muted ring-1 ring-line ring-inset active:text-ink',
+        active ? 'bg-accent text-accent-ink shadow-[0_1px_3px_rgba(0,0,0,0.18)]' : 'bg-pick text-board-ink ring-1 ring-board-line ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.08)] active:bg-board-key',
         className,
       )}
     >
@@ -46,7 +46,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
       return (
         <label className={clsx('relative flex min-w-0 flex-1 items-center px-3.5', cellFocus)}>
           <span className="flex-1 truncate text-[17px]">{f.v}</span>
-          <CalendarDays className="size-5 shrink-0 text-muted" aria-hidden />
+          <CalendarDays className="size-5 shrink-0 text-board-muted" aria-hidden />
           <input
             type="date"
             aria-label={f.k || '일자'}
@@ -77,7 +77,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             value={prefix ? digits : f.v}
             placeholder={prefix ? '숫자' : '앞자리 선택'}
             onChange={(e) => set(i, { v: prefix + e.target.value.replace(/\D/g, '') })}
-            className="h-10 w-full min-w-0 bg-transparent pl-1.5 text-[17px] outline-none placeholder:text-[15px] placeholder:text-muted/70 focus-visible:outline-none disabled:text-muted"
+            className="h-10 w-full min-w-0 bg-transparent pl-1.5 text-[17px] outline-none placeholder:text-[15px] placeholder:text-board-muted/80 focus-visible:outline-none disabled:text-board-muted"
           />
         </div>
       );
@@ -107,7 +107,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             onChange={(e) => set(i, { v: e.target.value })}
             className={clsx(
               'h-full w-full min-w-0 appearance-none bg-transparent py-3 pr-10 pl-3.5 text-[17px] outline-none focus-visible:outline-none',
-              !f.v && 'text-muted/70',
+              !f.v && 'text-board-muted/70',
             )}
           >
             <option value="">선택</option>
@@ -117,7 +117,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-3.5 size-5 text-muted" aria-hidden />
+          <ChevronDown className="pointer-events-none absolute right-3.5 size-5 text-board-muted" aria-hidden />
         </div>
       );
     }
@@ -130,7 +130,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
           value={f.v}
           placeholder={`${f.k || '내용'} 입력`}
           onChange={(e) => set(i, { v: e.target.value })}
-          className="h-full w-full min-w-0 bg-transparent py-3 pr-11 pl-3.5 text-[17px] outline-none placeholder:text-muted/70 focus-visible:outline-none"
+          className="h-full w-full min-w-0 bg-transparent py-3 pr-11 pl-3.5 text-[17px] outline-none placeholder:text-board-muted/80 focus-visible:outline-none"
         />
         {f.v && (
           <button
@@ -139,7 +139,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             onClick={() => set(i, { v: '' })}
             className="absolute right-1.5 grid size-9 place-items-center rounded-full"
           >
-            <span className="grid size-[22px] place-items-center rounded-full bg-muted/35 text-surface">
+            <span className="grid size-[22px] place-items-center rounded-full bg-board-muted/40 text-white">
               <X className="size-3.5" strokeWidth={3} />
             </span>
           </button>
@@ -149,14 +149,14 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
   }
 
   return (
-    <div className="divide-y divide-line overflow-hidden rounded-2xl bg-surface ring-1 ring-line">
+    <div className="divide-y divide-board-line overflow-hidden rounded-2xl bg-board text-board-ink scheme-light ring-1 ring-board-line shadow-[0_10px_28px_-14px_rgba(0,0,0,0.5)]">
       {fields.map((f, i) => (
         <div key={i} className="flex min-h-14">
           <input
             aria-label={`${i + 1}번째 항목 이름`}
             value={f.k}
             onChange={(e) => set(i, { k: e.target.value })}
-            className="w-[92px] shrink-0 bg-raised px-3.5 text-[15px] font-medium text-muted outline-none focus:bg-accent/10 focus:text-ink focus-visible:outline-none"
+            className="w-[92px] shrink-0 bg-board-key px-3.5 text-[15px] font-medium text-board-muted outline-none focus:bg-accent/15 focus:text-board-ink focus-visible:outline-none"
           />
           {valueCell(f, i)}
         </div>
