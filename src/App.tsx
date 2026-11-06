@@ -8,6 +8,7 @@ import { JobPanel, isBusy, type Job } from './components/JobPanel';
 import { Button, useAsk } from './components/ui';
 import { KEYS, loadTemplates, saveTemplates, type Field, type Templates } from './lib/storage';
 import { DATE_ROW, defaultFields, todayKorean, zipBaseName } from './lib/date';
+import { syncSamplePrefix } from './lib/fields';
 import {
   disconnectDropbox,
   ensureDropboxToken,
@@ -141,7 +142,7 @@ export default function App() {
     if (!t) return;
     const next = t.map((f) => ({ ...f }));
     if (next[DATE_ROW]) next[DATE_ROW].v = todayKorean();
-    setFields(next);
+    setFields(syncSamplePrefix(next)); // 채취구분과 시료번호 앞자리가 어긋나 있으면 맞춤
     setTemplateName(name);
     setSheetOpen(false);
   }

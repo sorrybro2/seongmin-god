@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { CalendarDays, ChevronDown, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Field } from '../lib/storage';
@@ -5,11 +6,12 @@ import { DATE_ROW, isoToKorean, koreanToISO } from '../lib/date';
 import {
   INSPECTOR_ROW,
   INSPECTORS,
-  SAMPLE_PREFIXES,
   SAMPLE_ROW,
   SAMPLE_TYPES,
   TYPE_ROW,
-  splitSampleNumber,
+  composeSample,
+  prefixForType,
+  sampleDigits,
 } from '../lib/fields';
 
 /** 입력 중인 칸은 노랑을 옅게 깔아서 표시 */
@@ -39,6 +41,27 @@ function Pick({ active, onClick, children, className }: { active: boolean; onCli
  */
 export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: Field[]) => void }) {
   const set = (i: number, patch: Partial<Field>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  const sampleInput = useRef<HTMLInputElement>(null);
+  const samplePrefix = prefixForType(fields[TYPE_ROW]?.v ?? '');
+
+  /** 채취구분을 고르면 시료번호 앞자리를 맞추고, 숫자가 비어 있으면 바로 숫자 입력으로 넘어간다 */
+  function pickType(type: string) {
+    const digits = sampleDigits(fields[SAMPLE_ROW].v);
+    onChange(
+      fields.map((f, j) =>
+        j === TYPE_ROW ? { ...f, v: type } : j === SAMPLE_ROW ? { ...f, v: composeSample(prefixForType(type), digits) } : f,
+      ),
+    );
+    const input = sampleInput.current;
+    if (input && !digits) {
+      input.readOnly = false; // 탭한 그 순간에 포커스해야 휴대폰 키패드가 바로 뜬다
+      input.focus();
+    }
+  }
+
+  // 입력 화면에서는 채취구분을 시료번호 바로 위에 (사진 속 표 순서는 그대로)
+  const order = fields.map((_, i) => i).filter((i) => i !== TYPE_ROW);
+  order.splice(order.indexOf(SAMPLE_ROW), 0, TYPE_ROW);
 
   function valueCell(f: Field, i: number) {
     // 일자: 한국어 날짜를 보여주고, 탭하면 달력
@@ -58,38 +81,40 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
       );
     }
 
-    // 시료번호: 앞자리(GW- / S-) 고른 뒤 숫자만
+    // 시료번호: 채취구분이 정한 앞자리(S- / GW-) + 숫자만
     if (i === SAMPLE_ROW) {
-      const { prefix, digits } = splitSampleNumber(f.v);
-      const legacyDigits = prefix ? digits : f.v.replace(/\D/g, '');
+      const prefix = samplePrefix;
       return (
-        <div className={clsx('flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-2.5 pl-2.5', cellFocus)}>
-          {SAMPLE_PREFIXES.map((p) => (
-            <Pick key={p} active={prefix === p} onClick={() => set(i, { v: p + legacyDigits })} className="w-[52px] shrink-0">
-              {p}
-            </Pick>
-          ))}
+        <div className={clsx('flex min-w-0 flex-1 items-center gap-2 px-3.5', prefix && cellFocus)}>
+          {prefix && <span className="shrink-0 text-[17px] font-semibold">{prefix}</span>}
           <input
+            ref={sampleInput}
             aria-label={`${f.k} 숫자`}
             inputMode="numeric"
             pattern="[0-9]*"
-            disabled={!prefix}
-            value={prefix ? digits : f.v}
-            placeholder={prefix ? '숫자' : '앞자리 선택'}
-            onChange={(e) => set(i, { v: prefix + e.target.value.replace(/\D/g, '') })}
-            className="h-10 w-full min-w-0 bg-transparent pl-1.5 text-[17px] outline-none placeholder:text-[15px] placeholder:text-board-muted/80 focus-visible:outline-none disabled:text-board-muted"
+            enterKeyHint="done"
+            readOnly={!prefix}
+            tabIndex={prefix ? 0 : -1}
+            value={prefix ? sampleDigits(f.v) : f.v}
+            placeholder={prefix ? '숫자 입력' : '채취구분을 먼저 고르세요'}
+            onChange={(e) => prefix && set(i, { v: composeSample(prefix, e.target.value.replace(/\D/g, '')) })}
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            className={clsx(
+              'h-12 w-full min-w-0 bg-transparent text-[17px] outline-none placeholder:text-board-muted/80 focus-visible:outline-none',
+              !prefix && 'pointer-events-none text-board-muted placeholder:text-[15px]',
+            )}
           />
         </div>
       );
     }
 
-    // 채취구분: 버튼으로 선택
+    // 채취구분: 버튼으로 선택 → 시료번호 앞자리 자동
     if (i === TYPE_ROW) {
       return (
         <div role="group" aria-label={f.k} className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 px-2.5 py-2">
           {SAMPLE_TYPES.map((t) => (
-            <Pick key={t} active={f.v === t} onClick={() => set(i, { v: t })}>
-              {t}
+            <Pick key={t.label} active={f.v === t.label} onClick={() => pickType(t.label)}>
+              {t.label}
             </Pick>
           ))}
         </div>
@@ -139,7 +164,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             onClick={() => set(i, { v: '' })}
             className="absolute right-1.5 grid size-9 place-items-center rounded-full"
           >
-            <span className="grid size-[22px] place-items-center rounded-full bg-board-muted/40 text-white">
+            <span className="grid size-5.5 place-items-center rounded-full bg-board-muted/40 text-white">
               <X className="size-3.5" strokeWidth={3} />
             </span>
           </button>
@@ -150,17 +175,20 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
 
   return (
     <div className="divide-y divide-board-line overflow-hidden rounded-2xl bg-board text-board-ink scheme-light ring-1 ring-board-line shadow-[0_10px_28px_-14px_rgba(0,0,0,0.5)]">
-      {fields.map((f, i) => (
+      {order.map((i) => {
+        const f = fields[i];
+        return (
         <div key={i} className="flex min-h-14">
           <input
             aria-label={`${i + 1}번째 항목 이름`}
             value={f.k}
             onChange={(e) => set(i, { k: e.target.value })}
-            className="w-[92px] shrink-0 bg-board-key px-3.5 text-[15px] font-medium text-board-muted outline-none focus:bg-accent/15 focus:text-board-ink focus-visible:outline-none"
+            className="w-23 shrink-0 bg-board-key px-3.5 text-[15px] font-medium text-board-muted outline-none focus:bg-accent/15 focus:text-board-ink focus-visible:outline-none"
           />
           {valueCell(f, i)}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
