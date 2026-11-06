@@ -1,0 +1,116 @@
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/*
+ * 팔레트: 공사 현장 — 콘크리트 회색 바탕 + 안전표지 노랑 포인트.
+ * 야외 햇빛 아래에서도 읽히도록 본문 대비를 높게 유지한다.
+ */
+:root {
+  --bg: #e9ecef;
+  --surface: #ffffff;
+  --raised: #f4f6f8;
+  --ink: #16191d;
+  --muted: #5f666e;
+  --line: #d3d8dd;
+  --accent: #ffc400;
+  --accent-press: #e6b000;
+  --accent-ink: #1c1700;
+  --danger: #d93025;
+  --ok: #16823a;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #101214;
+  --surface: #1a1d21;
+  --raised: #23272c;
+  --ink: #edeff2;
+  --muted: #9aa1a9;
+  --line: #2c3137;
+  --accent: #ffc400;
+  --accent-press: #e6b000;
+  --accent-ink: #1c1700;
+  --danger: #ff6b5e;
+  --ok: #3dd47a;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* 사진에 찍히는 표와 같은 글꼴 (canvas: Arial → 한글은 시스템 고딕) */
+  --font-board: Arial, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-press: var(--accent-press);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-bg text-ink font-sans antialiased;
+    overscroll-behavior-y: none;
+    word-break: keep-all; /* 한국어를 단어 단위로 줄바꿈 */
+    overflow-wrap: anywhere;
+  }
+  /* iOS 확대 방지: 입력창 글자 16px 이상 */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+  :focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 12px);
+  }
+}
+
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+@keyframes screen-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+.screen-in {
+  animation: screen-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
