@@ -8,7 +8,7 @@ import { JobPanel, isBusy, type Job } from './components/JobPanel';
 import { Button, useAsk } from './components/ui';
 import { KEYS, loadTemplates, saveTemplates, type Field, type Templates } from './lib/storage';
 import { DATE_ROW, defaultFields, todayKorean, zipBaseName } from './lib/date';
-import { syncSamplePrefix } from './lib/fields';
+import { forStamp, syncSamplePrefix } from './lib/fields';
 import {
   disconnectDropbox,
   ensureDropboxToken,
@@ -89,7 +89,7 @@ export default function App() {
   }
 
   async function run(files: File[]) {
-    const snapshot = fields.map((f) => ({ ...f }));
+    const snapshot = forStamp(fields).map((f) => ({ ...f })); // 앞자리만 있는 시료번호("S-")는 빈 값으로
     zipRef.current = null;
     try {
       setJob({ phase: 'sorting' });
@@ -315,7 +315,7 @@ export default function App() {
         <div className="mt-3 flex items-start gap-2 px-1 text-[13px] leading-snug text-muted">
           <FileArchive className="mt-px size-4 shrink-0" aria-hidden />
           <p className="min-w-0 break-keep">
-            <span className="font-semibold break-all text-ink">{zipBaseName(fields, templateName)}.zip</span> 으로 저장되고, 표는 사진 왼쪽 아래에{' '}
+            <span className="font-semibold break-all text-ink">{zipBaseName(forStamp(fields), templateName)}.zip</span> 으로 저장되고, 표는 사진 왼쪽 아래에{' '}
             {tableSize}% 크기로 들어갑니다.
           </p>
         </div>

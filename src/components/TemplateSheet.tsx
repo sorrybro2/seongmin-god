@@ -3,6 +3,7 @@ import { Drawer } from 'vaul';
 import { Check, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { Templates } from '../lib/storage';
+import { forStamp } from '../lib/fields';
 import { Button } from './ui';
 
 type Props = {
@@ -68,8 +69,8 @@ export function TemplateSheet({ open, onOpenChange, templates, current, onLoad, 
               <ul className="divide-y divide-line">
                 {names.map((n) => {
                   const active = n === current;
-                  const summary = templates[n]
-                    ?.filter((f, i) => i !== 2 && f.v)
+                  const summary = forStamp(templates[n] ?? [])
+                    .filter((f, i) => i !== 2 && f.v)
                     .map((f) => f.v)
                     .join(', ');
                   return (

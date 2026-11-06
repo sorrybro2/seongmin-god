@@ -9,9 +9,10 @@ import {
   SAMPLE_ROW,
   SAMPLE_TYPES,
   TYPE_ROW,
-  composeSample,
-  prefixForType,
-  sampleDigits,
+  activePrefix,
+  prefixesForType,
+  sampleForType,
+  splitSample,
 } from '../lib/fields';
 
 /** 입력 중인 칸은 노랑을 옅게 깔아서 표시 */
@@ -42,21 +43,33 @@ function Pick({ active, onClick, children, className }: { active: boolean; onCli
 export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: Field[]) => void }) {
   const set = (i: number, patch: Partial<Field>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const sampleInput = useRef<HTMLInputElement>(null);
-  const samplePrefix = prefixForType(fields[TYPE_ROW]?.v ?? '');
+  const type = fields[TYPE_ROW]?.v ?? '';
+  const prefixOptions = prefixesForType(type);
+  const samplePrefix = activePrefix(type, fields[SAMPLE_ROW]?.v ?? '');
 
-  /** 채취구분을 고르면 시료번호 앞자리를 맞추고, 숫자가 비어 있으면 바로 숫자 입력으로 넘어간다 */
-  function pickType(type: string) {
-    const digits = sampleDigits(fields[SAMPLE_ROW].v);
-    onChange(
-      fields.map((f, j) =>
-        j === TYPE_ROW ? { ...f, v: type } : j === SAMPLE_ROW ? { ...f, v: composeSample(prefixForType(type), digits) } : f,
-      ),
-    );
+  /** 숫자가 비어 있으면 바로 숫자 칸으로 (탭한 그 순간에 포커스해야 휴대폰 키패드가 뜬다) */
+  function focusDigitsIfEmpty(sampleValue: string) {
     const input = sampleInput.current;
-    if (input && !digits) {
-      input.readOnly = false; // 탭한 그 순간에 포커스해야 휴대폰 키패드가 바로 뜬다
+    if (input && !splitSample(sampleValue).digits) {
+      input.readOnly = false;
       input.focus();
     }
+  }
+
+  /** 채취구분을 고르면 시료번호 앞자리를 기본값으로 맞춘다 (숫자는 유지) */
+  function pickType(next: string) {
+    const sample = fields[SAMPLE_ROW].v;
+    onChange(
+      fields.map((f, j) => (j === TYPE_ROW ? { ...f, v: next } : j === SAMPLE_ROW ? { ...f, v: sampleForType(next, sample) } : f)),
+    );
+    focusDigitsIfEmpty(sample);
+  }
+
+  /** 토양의 S- / SA- 처럼 앞자리가 여러 개일 때 */
+  function pickPrefix(prefix: string) {
+    const sample = fields[SAMPLE_ROW].v;
+    set(SAMPLE_ROW, { v: prefix + splitSample(sample).digits });
+    focusDigitsIfEmpty(sample);
   }
 
   // 입력 화면에서는 채취구분을 시료번호 바로 위에 (사진 속 표 순서는 그대로)
@@ -81,12 +94,22 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
       );
     }
 
-    // 시료번호: 채취구분이 정한 앞자리(S- / GW-) + 숫자만
+    // 시료번호: 채취구분이 정한 앞자리 + 숫자만. 앞자리가 여러 개(토양 S- / SA-)면 버튼으로
     if (i === SAMPLE_ROW) {
       const prefix = samplePrefix;
       return (
-        <div className={clsx('flex min-w-0 flex-1 items-center gap-2 px-3.5', prefix && cellFocus)}>
-          {prefix && <span className="shrink-0 text-[17px] font-semibold">{prefix}</span>}
+        <div className={clsx('flex min-w-0 flex-1 items-center gap-2', prefixOptions.length > 1 ? 'pr-3.5 pl-2.5' : 'px-3.5', prefix && cellFocus)}>
+          {prefixOptions.length > 1 ? (
+            <div role="group" aria-label={`${f.k} 앞자리`} className="flex shrink-0 gap-1.5">
+              {prefixOptions.map((p) => (
+                <Pick key={p} active={prefix === p} onClick={() => pickPrefix(p)} className="h-9 min-w-12 px-2 text-[15px]">
+                  {p}
+                </Pick>
+              ))}
+            </div>
+          ) : (
+            prefix && <span className="shrink-0 text-[17px] font-semibold">{prefix}</span>
+          )}
           <input
             ref={sampleInput}
             aria-label={`${f.k} 숫자`}
@@ -95,9 +118,9 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             enterKeyHint="done"
             readOnly={!prefix}
             tabIndex={prefix ? 0 : -1}
-            value={prefix ? sampleDigits(f.v) : f.v}
+            value={prefix ? splitSample(f.v).digits : f.v}
             placeholder={prefix ? '숫자 입력' : '채취구분을 먼저 고르세요'}
-            onChange={(e) => prefix && set(i, { v: composeSample(prefix, e.target.value.replace(/\D/g, '')) })}
+            onChange={(e) => prefix && set(i, { v: prefix + e.target.value.replace(/\D/g, '') })}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className={clsx(
               'h-12 w-full min-w-0 bg-transparent text-[17px] outline-none placeholder:text-board-muted/80 focus-visible:outline-none',
