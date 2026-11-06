@@ -10,57 +10,56 @@ export const TYPE_ROW = 3;
 export const INSPECTOR_ROW = 4;
 
 /**
- * 채취구분 → 시료번호 앞자리. 첫 번째가 기본값.
- * 앞자리가 2개 이상이면 시료번호 칸에 버튼으로 나온다.
+ * 채취구분 → 시료번호 앞자리 (head + '-').
+ * letters가 true면 head와 '-' 사이에 영문 기호를 칠 수 있다. 토양: S-, SA-, SB-, SC- ...
  */
 export const SAMPLE_TYPES = [
-  { label: '토양', prefixes: ['S-', 'SA-'] },
-  { label: '지하수', prefixes: ['GW-'] },
+  { label: '토양', head: 'S', letters: true },
+  { label: '지하수', head: 'GW', letters: false },
 ];
+export type SampleType = (typeof SAMPLE_TYPES)[number];
 
 /** 조사자 */
 export const INSPECTORS = ['유성민', '김병수', '이동형', '유미애'];
 
-// 긴 것부터 비교해야 SA- 가 S- 로 잘못 읽히지 않는다
-const ALL_PREFIXES = SAMPLE_TYPES.flatMap((t) => t.prefixes).sort((a, b) => b.length - a.length);
+export const sampleTypeOf = (label: string) => SAMPLE_TYPES.find((t) => t.label === label);
 
-export const prefixesForType = (type: string) => SAMPLE_TYPES.find((t) => t.label === type)?.prefixes ?? [];
+/** head와 '-' 사이 기호: 영문만, 대문자로 */
+export const cleanCode = (s: string) => s.toUpperCase().replace(/[^A-Z]/g, '');
 
-/** "SA-12" → { prefix: 'SA-', digits: '12' }. 형식이 다르면 prefix 없이 숫자만 ("BH-3" → '3') */
-export function splitSample(value: string) {
-  const prefix = ALL_PREFIXES.find((p) => value.startsWith(p)) ?? '';
-  return { prefix, digits: value.slice(prefix.length).replace(/\D/g, '') };
+/** 숫자 부분: 마지막 '-' 뒤의 숫자 ("SA-12" → "12", 예전 형식 "BH-3" → "3") */
+export function digitsOf(value: string) {
+  const dash = value.lastIndexOf('-');
+  return (dash >= 0 ? value.slice(dash + 1) : value).replace(/\D/g, '');
 }
 
-/** 지금 채취구분에서 쓰는 앞자리: 값에 맞는 앞자리가 있으면 그것, 없으면 기본값 */
-export function activePrefix(type: string, value: string) {
-  const options = prefixesForType(type);
-  const { prefix } = splitSample(value);
-  return options.includes(prefix) ? prefix : (options[0] ?? '');
+/** head와 '-' 사이 기호 ("SA-12" → "A"). 그 채취구분 형식이 아니면 빈 값 */
+export function codeOf(t: SampleType, value: string) {
+  if (!t.letters) return '';
+  return value.match(new RegExp(`^${t.head}([A-Z]*)-`))?.[1] ?? '';
 }
 
-/** 채취구분을 바꿀 때: 숫자는 두고 앞자리만 새 구분에 맞춘다 */
-export function sampleForType(type: string, value: string) {
-  const options = prefixesForType(type);
-  if (!options.length) return value;
-  const { prefix, digits } = splitSample(value);
-  return (options.includes(prefix) ? prefix : options[0]) + digits;
+export const buildSample = (t: SampleType, code: string, digits: string) => `${t.head}${t.letters ? code : ''}-${digits}`;
+
+/** 채취구분을 바꾸거나 템플릿을 불러올 때: 숫자(와 맞으면 기호)는 두고 앞자리만 그 구분에 맞춘다 */
+export function sampleForType(label: string, value: string) {
+  const t = sampleTypeOf(label);
+  return t ? buildSample(t, codeOf(t, value), digitsOf(value)) : value;
 }
 
 /** 템플릿 불러올 때 채취구분과 시료번호 앞자리가 어긋나 있으면 맞춘다 */
 export function syncSamplePrefix(fields: Field[]): Field[] {
   const type = fields[TYPE_ROW]?.v ?? '';
-  const sample = fields[SAMPLE_ROW];
-  if (!sample?.v || !prefixesForType(type).length) return fields;
+  if (!fields[SAMPLE_ROW]?.v || !sampleTypeOf(type)) return fields;
   return fields.map((f, i) => (i === SAMPLE_ROW ? { ...f, v: sampleForType(type, f.v) } : f));
 }
 
 /**
- * 사진·파일 이름에 쓰는 값: 숫자 없이 앞자리만 있으면("S-") 빈 값으로.
- * (입력 중에는 고른 앞자리를 기억하려고 "SA-"처럼 앞자리만 담아 둘 수 있다)
+ * 사진·파일 이름에 쓰는 값: 숫자 없이 앞자리만 있으면("S-", "SA-") 빈 값으로.
+ * (입력 중에는 앞자리를 기억하려고 앞자리만 담아 둘 수 있다)
  */
 export function forStamp(fields: Field[]): Field[] {
   const sample = fields[SAMPLE_ROW];
-  if (!sample || !ALL_PREFIXES.includes(sample.v)) return fields;
+  if (!sample || !/^[A-Z]+-$/.test(sample.v)) return fields;
   return fields.map((f, i) => (i === SAMPLE_ROW ? { ...f, v: '' } : f));
 }

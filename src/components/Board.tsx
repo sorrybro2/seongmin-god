@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { CalendarDays, ChevronDown, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Field } from '../lib/storage';
@@ -9,17 +9,19 @@ import {
   SAMPLE_ROW,
   SAMPLE_TYPES,
   TYPE_ROW,
-  activePrefix,
-  prefixesForType,
+  buildSample,
+  cleanCode,
+  codeOf,
+  digitsOf,
   sampleForType,
-  splitSample,
+  sampleTypeOf,
 } from '../lib/fields';
 
 /** 입력 중인 칸은 노랑을 옅게 깔아서 표시 */
 const cellFocus = 'focus-within:bg-accent/15';
 
 /** 표 안 선택 버튼: 고르면 노랑, 아니면 옅은 회색 */
-function Pick({ active, onClick, children, className }: { active: boolean; onClick: () => void; children: string; className?: string }) {
+function Pick({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
   return (
     <button
       type="button"
@@ -27,12 +29,63 @@ function Pick({ active, onClick, children, className }: { active: boolean; onCli
       onClick={onClick}
       className={clsx(
         'h-10 rounded-lg text-[16px] font-semibold transition-colors',
-        active ? 'bg-accent text-accent-ink shadow-[0_1px_3px_rgba(0,0,0,0.18)]' : 'bg-pick text-board-ink ring-1 ring-board-line ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.08)] active:bg-board-key',
-        className,
+        active
+          ? 'bg-accent text-accent-ink shadow-[0_1px_3px_rgba(0,0,0,0.18)]'
+          : 'bg-pick text-board-ink ring-1 ring-board-line ring-inset shadow-[0_1px_2px_rgba(0,0,0,0.08)] active:bg-board-key',
       )}
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * "S-"의 S와 - 사이에 끼워 넣는 글자 칸.
+ * 글자 폭만큼만 늘어나서, 비어 있으면 예전처럼 "S-"로 보이고 B를 치면 "SB-"가 된다.
+ */
+function CodeSlot({ id, label, value, onChange, onNext }: { id: string; label: string; value: string; onChange: (v: string) => void; onNext: () => void }) {
+  const mirror = useRef<HTMLSpanElement>(null);
+  const [textWidth, setTextWidth] = useState(0);
+  const [focused, setFocused] = useState(false);
+
+  useLayoutEffect(() => {
+    const measure = () => setTextWidth(mirror.current?.getBoundingClientRect().width ?? 0);
+    measure();
+    document.fonts?.ready.then(measure); // 글꼴이 늦게 로드돼도 폭을 다시 맞춤
+  }, [value]);
+
+  return (
+    <span className="relative inline-flex">
+      <span ref={mirror} aria-hidden className="invisible absolute whitespace-pre">
+        {value}
+      </span>
+      <input
+        id={id}
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(cleanCode(e.target.value))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onNext();
+          }
+        }}
+        inputMode="email" // 영문 키보드가 뜨게
+        autoCapitalize="characters"
+        autoComplete="off"
+        autoCorrect="off"
+        spellCheck={false}
+        enterKeyHint="next"
+        maxLength={4}
+        style={{ width: value ? textWidth + 1 : focused ? 10 : 1 }}
+        className={clsx(
+          'bg-transparent p-0 text-[17px] font-semibold outline-none focus-visible:outline-none',
+          focused && 'shadow-[inset_0_-2px_0_var(--accent)]',
+        )}
+      />
+    </span>
   );
 }
 
@@ -43,33 +96,19 @@ function Pick({ active, onClick, children, className }: { active: boolean; onCli
 export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: Field[]) => void }) {
   const set = (i: number, patch: Partial<Field>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
   const sampleInput = useRef<HTMLInputElement>(null);
-  const type = fields[TYPE_ROW]?.v ?? '';
-  const prefixOptions = prefixesForType(type);
-  const samplePrefix = activePrefix(type, fields[SAMPLE_ROW]?.v ?? '');
+  const sampleType = sampleTypeOf(fields[TYPE_ROW]?.v ?? '');
 
-  /** 숫자가 비어 있으면 바로 숫자 칸으로 (탭한 그 순간에 포커스해야 휴대폰 키패드가 뜬다) */
-  function focusDigitsIfEmpty(sampleValue: string) {
-    const input = sampleInput.current;
-    if (input && !splitSample(sampleValue).digits) {
-      input.readOnly = false;
-      input.focus();
-    }
-  }
-
-  /** 채취구분을 고르면 시료번호 앞자리를 기본값으로 맞춘다 (숫자는 유지) */
+  /** 채취구분을 고르면 시료번호 앞자리를 맞추고(숫자는 유지), 숫자가 비어 있으면 바로 숫자 칸으로 */
   function pickType(next: string) {
     const sample = fields[SAMPLE_ROW].v;
     onChange(
       fields.map((f, j) => (j === TYPE_ROW ? { ...f, v: next } : j === SAMPLE_ROW ? { ...f, v: sampleForType(next, sample) } : f)),
     );
-    focusDigitsIfEmpty(sample);
-  }
-
-  /** 토양의 S- / SA- 처럼 앞자리가 여러 개일 때 */
-  function pickPrefix(prefix: string) {
-    const sample = fields[SAMPLE_ROW].v;
-    set(SAMPLE_ROW, { v: prefix + splitSample(sample).digits });
-    focusDigitsIfEmpty(sample);
+    const input = sampleInput.current;
+    if (input && !digitsOf(sample)) {
+      input.readOnly = false; // 탭한 그 순간에 포커스해야 휴대폰 키패드가 바로 뜬다
+      input.focus();
+    }
   }
 
   // 입력 화면에서는 채취구분을 시료번호 바로 위에 (사진 속 표 순서는 그대로)
@@ -94,37 +133,44 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
       );
     }
 
-    // 시료번호: 채취구분이 정한 앞자리 + 숫자만. 앞자리가 여러 개(토양 S- / SA-)면 버튼으로
+    // 시료번호: 채취구분이 정한 앞자리 + 숫자만. 토양은 "S-"를 누르면 S와 - 사이에 글자(SA-, SB- …)
     if (i === SAMPLE_ROW) {
-      const prefix = samplePrefix;
+      const t = sampleType;
+      const code = t ? codeOf(t, f.v) : '';
+      const digits = t ? digitsOf(f.v) : '';
       return (
-        <div className={clsx('flex min-w-0 flex-1 items-center gap-2', prefixOptions.length > 1 ? 'pr-3.5 pl-2.5' : 'px-3.5', prefix && cellFocus)}>
-          {prefixOptions.length > 1 ? (
-            <div role="group" aria-label={`${f.k} 앞자리`} className="flex shrink-0 gap-1.5">
-              {prefixOptions.map((p) => (
-                <Pick key={p} active={prefix === p} onClick={() => pickPrefix(p)} className="h-9 min-w-12 px-2 text-[15px]">
-                  {p}
-                </Pick>
-              ))}
-            </div>
-          ) : (
-            prefix && <span className="shrink-0 text-[17px] font-semibold">{prefix}</span>
-          )}
+        <div className={clsx('flex min-w-0 flex-1 items-center gap-2 px-3.5', t && cellFocus)}>
+          {t &&
+            (t.letters ? (
+              <label htmlFor="sample-code" className="flex shrink-0 cursor-text items-center self-stretch text-[17px] font-semibold">
+                {t.head}
+                <CodeSlot
+                  id="sample-code"
+                  label={`${t.label} 기호 (${t.head}와 - 사이)`}
+                  value={code}
+                  onChange={(c) => set(i, { v: buildSample(t, c, digits) })}
+                  onNext={() => sampleInput.current?.focus()}
+                />
+                -
+              </label>
+            ) : (
+              <span className="shrink-0 text-[17px] font-semibold">{t.head}-</span>
+            ))}
           <input
             ref={sampleInput}
             aria-label={`${f.k} 숫자`}
             inputMode="numeric"
             pattern="[0-9]*"
             enterKeyHint="done"
-            readOnly={!prefix}
-            tabIndex={prefix ? 0 : -1}
-            value={prefix ? splitSample(f.v).digits : f.v}
-            placeholder={prefix ? '숫자 입력' : '채취구분을 먼저 고르세요'}
-            onChange={(e) => prefix && set(i, { v: prefix + e.target.value.replace(/\D/g, '') })}
+            readOnly={!t}
+            tabIndex={t ? 0 : -1}
+            value={t ? digits : f.v}
+            placeholder={t ? '숫자 입력' : '채취구분을 먼저 고르세요'}
+            onChange={(e) => t && set(i, { v: buildSample(t, code, e.target.value.replace(/\D/g, '')) })}
             onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
             className={clsx(
               'h-12 w-full min-w-0 bg-transparent text-[17px] outline-none placeholder:text-board-muted/80 focus-visible:outline-none',
-              !prefix && 'pointer-events-none text-board-muted placeholder:text-[15px]',
+              !t && 'pointer-events-none text-board-muted placeholder:text-[15px]',
             )}
           />
         </div>
@@ -201,15 +247,15 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
       {order.map((i) => {
         const f = fields[i];
         return (
-        <div key={i} className="flex min-h-14">
-          <input
-            aria-label={`${i + 1}번째 항목 이름`}
-            value={f.k}
-            onChange={(e) => set(i, { k: e.target.value })}
-            className="w-23 shrink-0 bg-board-key px-3.5 text-[15px] font-medium text-board-muted outline-none focus:bg-accent/15 focus:text-board-ink focus-visible:outline-none"
-          />
-          {valueCell(f, i)}
-        </div>
+          <div key={i} className="flex min-h-14">
+            <input
+              aria-label={`${i + 1}번째 항목 이름`}
+              value={f.k}
+              onChange={(e) => set(i, { k: e.target.value })}
+              className="w-23 shrink-0 bg-board-key px-3.5 text-[15px] font-medium text-board-muted outline-none focus:bg-accent/15 focus:text-board-ink focus-visible:outline-none"
+            />
+            {valueCell(f, i)}
+          </div>
         );
       })}
     </div>
