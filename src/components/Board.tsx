@@ -1,6 +1,36 @@
-import { CalendarDays, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, X } from 'lucide-react';
+import clsx from 'clsx';
 import type { Field } from '../lib/storage';
 import { DATE_ROW, isoToKorean, koreanToISO } from '../lib/date';
+import {
+  INSPECTOR_ROW,
+  INSPECTORS,
+  SAMPLE_PREFIXES,
+  SAMPLE_ROW,
+  SAMPLE_TYPES,
+  TYPE_ROW,
+  splitSampleNumber,
+} from '../lib/fields';
+
+const cellFocus = 'focus-within:bg-[#fff3c4]';
+
+/** 표 안에서 쓰는 선택 버튼 (흰 표 위에서 검은 테두리, 고르면 노랑) */
+function Pick({ active, onClick, children, className }: { active: boolean; onClick: () => void; children: string; className?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={clsx(
+        'h-10 rounded-md border-[1.5px] border-black text-[16px] font-semibold transition-colors',
+        active ? 'bg-[#ffc400] text-black' : 'bg-white text-black active:bg-neutral-100',
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 /**
  * 사진 왼쪽 아래에 찍히는 표를 그대로 본뜬 입력판.
@@ -8,6 +38,114 @@ import { DATE_ROW, isoToKorean, koreanToISO } from '../lib/date';
  */
 export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: Field[]) => void }) {
   const set = (i: number, patch: Partial<Field>) => onChange(fields.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+
+  function valueCell(f: Field, i: number) {
+    // 일자: 한국어 날짜를 보여주고, 탭하면 달력
+    if (i === DATE_ROW) {
+      return (
+        <label className={clsx('relative flex min-w-0 flex-1 items-center px-3', cellFocus)}>
+          <span className="flex-1 truncate text-[17px]">{f.v}</span>
+          <CalendarDays className="size-5 shrink-0 text-neutral-500" aria-hidden />
+          <input
+            type="date"
+            aria-label={f.k || '일자'}
+            value={koreanToISO(f.v)}
+            onChange={(e) => e.target.value && set(i, { v: isoToKorean(e.target.value) })}
+            className="absolute inset-0 h-full w-full appearance-none opacity-0"
+          />
+        </label>
+      );
+    }
+
+    // 시료번호: 앞자리(GW- / S-) 고른 뒤 숫자만
+    if (i === SAMPLE_ROW) {
+      const { prefix, digits } = splitSampleNumber(f.v);
+      const legacyDigits = prefix ? digits : f.v.replace(/\D/g, '');
+      return (
+        <div className={clsx('flex min-w-0 flex-1 items-center gap-1.5 py-2 pr-2 pl-2', cellFocus)}>
+          {SAMPLE_PREFIXES.map((p) => (
+            <Pick key={p} active={prefix === p} onClick={() => set(i, { v: p + legacyDigits })} className="w-[52px] shrink-0">
+              {p}
+            </Pick>
+          ))}
+          <input
+            aria-label={`${f.k} 숫자`}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            disabled={!prefix}
+            value={prefix ? digits : f.v}
+            placeholder={prefix ? '숫자' : '앞자리 선택'}
+            onChange={(e) => set(i, { v: prefix + e.target.value.replace(/\D/g, '') })}
+            className="h-10 w-full min-w-0 bg-transparent pl-1.5 text-[17px] outline-none placeholder:text-[15px] placeholder:text-neutral-400 focus-visible:outline-none disabled:text-neutral-400"
+          />
+        </div>
+      );
+    }
+
+    // 채취구분: 버튼으로 선택
+    if (i === TYPE_ROW) {
+      return (
+        <div role="group" aria-label={f.k} className="grid min-w-0 flex-1 grid-cols-2 gap-1.5 p-2">
+          {SAMPLE_TYPES.map((t) => (
+            <Pick key={t} active={f.v === t} onClick={() => set(i, { v: t })}>
+              {t}
+            </Pick>
+          ))}
+        </div>
+      );
+    }
+
+    // 조사자: 목록에서 선택 (목록에 없는 기존 값은 지워지지 않게 그대로 보여줌)
+    if (i === INSPECTOR_ROW) {
+      const options = f.v && !INSPECTORS.includes(f.v) ? [f.v, ...INSPECTORS] : INSPECTORS;
+      return (
+        <div className={clsx('relative flex min-w-0 flex-1 items-center', cellFocus)}>
+          <select
+            aria-label={f.k}
+            value={f.v}
+            onChange={(e) => set(i, { v: e.target.value })}
+            className={clsx(
+              'h-full w-full min-w-0 appearance-none bg-transparent py-3 pr-10 pl-3 text-[17px] outline-none focus-visible:outline-none',
+              !f.v && 'text-neutral-400',
+            )}
+          >
+            <option value="">선택</option>
+            {options.map((n) => (
+              <option key={n} value={n} className="text-black">
+                {n}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 size-5 text-neutral-500" aria-hidden />
+        </div>
+      );
+    }
+
+    // 그 외(공사명): 자유 입력
+    return (
+      <div className={clsx('relative flex min-w-0 flex-1 items-center', cellFocus)}>
+        <input
+          aria-label={f.k}
+          value={f.v}
+          placeholder={`${f.k || '내용'} 입력`}
+          onChange={(e) => set(i, { v: e.target.value })}
+          className="h-full w-full min-w-0 bg-transparent py-3 pr-11 pl-3 text-[17px] outline-none placeholder:text-neutral-400 focus-visible:outline-none"
+        />
+        {f.v && (
+          <button
+            type="button"
+            aria-label={`${f.k} 지우기`}
+            onClick={() => set(i, { v: '' })}
+            className="absolute right-1.5 grid size-9 place-items-center rounded-full text-neutral-400 active:text-neutral-700"
+          >
+            <span className="grid size-[22px] place-items-center rounded-full bg-neutral-300 text-white">
+              <X className="size-3.5" strokeWidth={3} />
+            </span>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="overflow-hidden rounded-[3px] border-2 border-black bg-white font-board text-black shadow-[0_10px_30px_-12px_rgba(0,0,0,0.45)]">
@@ -19,41 +157,7 @@ export function Board({ fields, onChange }: { fields: Field[]; onChange: (next: 
             onChange={(e) => set(i, { k: e.target.value })}
             className="w-[96px] shrink-0 border-r border-black bg-white px-3 text-[16px] outline-none focus:bg-[#fff3c4] focus-visible:outline-none"
           />
-          {i === DATE_ROW ? (
-            <label className="relative flex min-w-0 flex-1 items-center px-3 focus-within:bg-[#fff3c4]">
-              <span className="flex-1 truncate text-[17px]">{f.v}</span>
-              <CalendarDays className="size-5 shrink-0 text-neutral-500" aria-hidden />
-              <input
-                type="date"
-                aria-label={f.k || '일자'}
-                value={koreanToISO(f.v)}
-                onChange={(e) => e.target.value && set(i, { v: isoToKorean(e.target.value) })}
-                className="absolute inset-0 h-full w-full appearance-none opacity-0"
-              />
-            </label>
-          ) : (
-            <div className="relative flex min-w-0 flex-1 items-center focus-within:bg-[#fff3c4]">
-              <input
-                aria-label={f.k}
-                value={f.v}
-                placeholder={`${f.k || '내용'} 입력`}
-                onChange={(e) => set(i, { v: e.target.value })}
-                className="h-full w-full min-w-0 bg-transparent py-3 pr-11 pl-3 text-[17px] outline-none placeholder:text-neutral-400 focus-visible:outline-none"
-              />
-              {f.v && (
-                <button
-                  type="button"
-                  aria-label={`${f.k} 지우기`}
-                  onClick={() => set(i, { v: '' })}
-                  className="absolute right-1.5 grid size-9 place-items-center rounded-full text-neutral-400 active:text-neutral-700"
-                >
-                  <span className="grid size-[22px] place-items-center rounded-full bg-neutral-300 text-white">
-                    <X className="size-3.5" strokeWidth={3} />
-                  </span>
-                </button>
-              )}
-            </div>
-          )}
+          {valueCell(f, i)}
         </div>
       ))}
     </div>
