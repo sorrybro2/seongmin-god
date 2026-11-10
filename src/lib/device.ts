@@ -15,7 +15,26 @@ export function downloadText(text: string, fileName: string) {
   saveToLocal(new Blob([text], { type: 'application/json' }), fileName);
 }
 
-export const filesAppLabel = isAndroid ? '다운로드 폴더 확인' : '파일 앱 열기';
+/** 클립보드 복사. http(사내망 주소)에서는 clipboard API가 없어서 옛 방식으로 */
+export async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+export const filesAppLabel =isAndroid ? '다운로드 폴더 확인' : '파일 앱 열기';
 
 /** iOS는 파일 앱을 열고, 그 외에는 저장 위치를 알려준다. 열 수 없으면 안내 문구를 돌려준다. */
 export function openFilesApp(): string | null {

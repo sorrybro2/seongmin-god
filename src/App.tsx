@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast, Toaster } from 'sonner';
-import { Camera, ChevronDown, FileArchive, Settings, X } from 'lucide-react';
+import { Camera, ChevronDown, FileArchive, MapPin, Settings, X } from 'lucide-react';
 import { Board } from './components/Board';
 import { TemplateSheet } from './components/TemplateSheet';
 import { SettingsScreen } from './components/SettingsScreen';
+import { CoordsScreen } from './components/CoordsScreen';
 import { JobPanel, isBusy, type Job } from './components/JobPanel';
 import { Button, useAsk } from './components/ui';
 import { KEYS, loadTemplates, saveTemplates, type Field, type Templates } from './lib/storage';
@@ -29,7 +30,7 @@ const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export default function App() {
   const ask = useAsk();
-  const [screen, setScreen] = useState<'main' | 'settings'>('main');
+  const [screen, setScreen] = useState<'main' | 'settings' | 'coords'>('main');
 
   const [fields, setFields] = useState<Field[]>(defaultFields);
   const [templateName, setTemplateName] = useState('');
@@ -235,7 +236,7 @@ export default function App() {
 
   return (
     <>
-      {screen === 'settings' ? renderSettings() : renderMain()}
+      {screen === 'settings' ? renderSettings() : screen === 'coords' ? <CoordsScreen onBack={() => setScreen('main')} /> : renderMain()}
       <Toaster
         position="top-center"
         theme={theme}
@@ -275,14 +276,24 @@ export default function App() {
       <header className="pt-safe sticky top-0 z-20 bg-bg/90 backdrop-blur-md">
         <div className="flex h-14 items-center justify-between pr-2 pl-4">
           <h1 className="text-[20px] font-extrabold tracking-[-0.02em]">현장 사진 Pro</h1>
-          <button
-            type="button"
-            aria-label="설정"
-            onClick={() => setScreen('settings')}
-            className="grid size-11 place-items-center rounded-full text-ink active:bg-raised"
-          >
-            <Settings className="size-6" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setScreen('coords')}
+              className="flex h-10 items-center gap-1 rounded-full bg-surface pr-3.5 pl-2.5 text-[15px] font-semibold text-ink active:bg-raised"
+            >
+              <MapPin className="size-5" />
+              좌표
+            </button>
+            <button
+              type="button"
+              aria-label="설정"
+              onClick={() => setScreen('settings')}
+              className="grid size-11 place-items-center rounded-full text-ink active:bg-raised"
+            >
+              <Settings className="size-6" />
+            </button>
+          </div>
         </div>
       </header>
 
