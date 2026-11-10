@@ -174,17 +174,22 @@ async function processImage(file: File, fields: Field[], tableSize: number): Pro
       if (extractedExif.ExposureCompensation !== undefined) originalExifObj.Exif[piexif.ExifIFD.ExposureBiasValue] = toRational(extractedExif.ExposureCompensation);
       if (extractedExif.MeteringMode !== undefined) originalExifObj.Exif[piexif.ExifIFD.MeteringMode] = extractedExif.MeteringMode;
 
-      // GPS
-      if (extractedExif.latitude && extractedExif.longitude) {
+      // GPS: JPEG는 원본 EXIF에 이미 들어 있으니 그대로 둔다.
+      // HEIC처럼 원본 EXIF를 못 읽었을 때만 exifr 값으로 채운다 (사진 좌표 화면이 이 위치를 읽음).
+      // mergeOutput:false라서 위도·경도는 gps 묶음 안에, 나머지 태그는 번호(6 = GPSAltitude, 5 = GPSAltitudeRef)로 들어 있다.
+      const gps = extractedExif.gps;
+      if (gps?.latitude && gps?.longitude && !originalExifObj.GPS?.[piexif.GPSIFD.GPSLatitude]) {
         if (!originalExifObj.GPS) originalExifObj.GPS = {};
         originalExifObj.GPS[piexif.GPSIFD.GPSVersionID] = [2, 2, 0, 0];
-        originalExifObj.GPS[piexif.GPSIFD.GPSLatitudeRef] = extractedExif.latitude < 0 ? 'S' : 'N';
-        originalExifObj.GPS[piexif.GPSIFD.GPSLatitude] = degToDmsRational(extractedExif.latitude);
-        originalExifObj.GPS[piexif.GPSIFD.GPSLongitudeRef] = extractedExif.longitude < 0 ? 'W' : 'E';
-        originalExifObj.GPS[piexif.GPSIFD.GPSLongitude] = degToDmsRational(extractedExif.longitude);
-        if (extractedExif.GPSAltitude !== undefined) {
-          originalExifObj.GPS[piexif.GPSIFD.GPSAltitude] = toRational(extractedExif.GPSAltitude);
-          originalExifObj.GPS[piexif.GPSIFD.GPSAltitudeRef] = extractedExif.GPSAltitude < 0 ? 1 : 0;
+        originalExifObj.GPS[piexif.GPSIFD.GPSLatitudeRef] = gps.latitude < 0 ? 'S' : 'N';
+        originalExifObj.GPS[piexif.GPSIFD.GPSLatitude] = degToDmsRational(gps.latitude);
+        originalExifObj.GPS[piexif.GPSIFD.GPSLongitudeRef] = gps.longitude < 0 ? 'W' : 'E';
+        originalExifObj.GPS[piexif.GPSIFD.GPSLongitude] = degToDmsRational(gps.longitude);
+        const alt = gps[piexif.GPSIFD.GPSAltitude];
+        if (typeof alt === 'number' && Number.isFinite(alt)) {
+          const ref = gps[piexif.GPSIFD.GPSAltitudeRef];
+          originalExifObj.GPS[piexif.GPSIFD.GPSAltitude] = toRational(Math.abs(alt));
+          originalExifObj.GPS[piexif.GPSIFD.GPSAltitudeRef] = Number(ref?.[0] ?? ref ?? 0) === 1 ? 1 : 0;
         }
       }
     }
